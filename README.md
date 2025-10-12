@@ -45,14 +45,14 @@ Correlation matrix computation (df.corr())
 
 Data scaling for visualization (normalization for comparative graphs)
 
-4️⃣ Exploratory Data Analysis Results
-📊 Statistical Summaries
+# Exploratory Data Analysis Results
+Statistical Summaries
 
 Descriptive statistics computed for EV count, charger density, and income.
 
 Found positive correlation between median income and EV adoption, with clustering of high-EV states in the West Coast region.
 
-🧩 Visual Insights
+Visual Insights
 
 Histogram: Distribution of EVs by state shows high skewness (California dominates).
 
