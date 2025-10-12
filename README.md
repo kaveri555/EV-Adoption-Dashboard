@@ -119,9 +119,8 @@ streamlit run app/app.py
 
 Live Dashboard: https://share.streamlit.io/kaveri555/EV-Adoption-Dashboard
 
-# Folder Structure
+# Folder Structure  
 EV-Adoption-Dashboard/
-...
 ├── data/
 │   ├── raw/               # Unprocessed datasets
 │   └── processed/         # Cleaned and merged datasets
@@ -135,7 +134,8 @@ EV-Adoption-Dashboard/
 │
 ├── README.md
 └── requirements.txt
-...
+ 
+
 
 # Acknowledgments
 Use of ChatGPT for suggestions on Streamlit app layout, interactive feature design, and overall content organization, including guidance on structuring the dashboard into logical sections and improving user documentation (OpenAI chatgpt-5 , 2025)
