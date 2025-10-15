@@ -34,7 +34,11 @@ All preprocessing and analysis steps are performed in two Jupyter notebooks:
 # Notebook
 /notebooks/data_cleaning.ipynb:	Data import, missing value treatment, duplicate removal, column standardization, and dataset merging.
 /notebooks/EDA.ipynb:	Exploratory Data Analysis using visualizations and statistical summaries based on CMSE 830 class methods.
-
+# Dataset
+EV Population datset and charging dataset couldnt be uploaded to data folder due to size constraints 
+Here are the link to the dataset 
+EV Population Kaggle dataset : https://www.kaggle.com/datasets/utkarshx27/electric-vehicle-population-data
+Alternate charging stations : https://afdc.energy.gov/stations#/find/nearest
 # Key techniques applied:
 
 Encoding categorical variables (region → numeric labels)
