@@ -22,7 +22,7 @@ st.title("🔋 Electric Vehicle Adoption Across U.S. States")
 # SIDEBAR
 # ------------------------------------------------------------
 with st.sidebar:
-    st.image("app/logo.png", use_container_width=True)
+    st.image("app/logo", use_container_width=True)
     st.title("EV-Adoption Dashboard")
     st.caption("Developed by Kaveri | CMSE 830")
 
