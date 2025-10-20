@@ -344,18 +344,66 @@ with tab6:
     ## ℹ About This Dashboard  
 
     **Project Title:** *Electric Vehicle (EV) Adoption and Charging Infrastructure Analysis Across U.S. States*  
-    **Course:** *CMSE 830 — Statistical Data Analysis & Visualization*  
-    **Developed by:** *Kaveri Palicherla*  
+    **Course:** *CMSE 830 
+    **Developed by:** *Kaveri palicherla*  
 
     ---
+
+    ###  **Project Objective**  
     This dashboard provides an integrated, data-driven view of **Electric Vehicle (EV) adoption** across the United States,  
     analyzing how **income levels, charging infrastructure, and regional factors** influence the rate of EV growth.  
-    It highlights correlations between infrastructure and affordability, helping identify underserved regions.
+
+    The goal is to explore **whether accessibility and affordability align with adoption** — identifying states where  
+    charging infrastructure and policy support may be lagging behind EV ownership trends.
 
     ---
-    *Data-driven insights for a sustainable, electric future.*
-    """
-    )
+
+    ###  **Analytical Highlights**  
+    1. **Distribution Trends:** Histograms and boxplots show right-skewed adoption patterns — a few states dominate the EV market.  
+    2. **Bivariate Analysis:** Positive correlation between *median household income* and *charger availability*.  
+    3. **Fairness Evaluation:** Income-based quartile segmentation highlights disparities in EV accessibility.  
+    4. **Geospatial Visualization:** Choropleth maps and interactive filters identify **EV and charger hotspots** versus underserved regions.  
+    5. **Statistical Validation:** ANOVA and correlation tests confirm significant relationships between **income and EV density**.  
+
+    ---
+
+    ###  **Data Sources**  
+    - **EV Population Data:** Electric vehicle registration counts by U.S. state.  
+    - **Charging Station Data:** Alternative Fuel Data Center (AFDC) public charging locations.  
+    - **Income Data:** U.S. Census Bureau’s American Community Survey (ACS).  
+    - **Merged Dataset:** Combined and processed in Python using `pandas`, `numpy`, and custom feature engineering.  
+
+    ---
+
+    ###  **Tools & Techniques**  
+    - **Languages & Libraries:** Python, Pandas, NumPy, Plotly, Seaborn, Streamlit  
+    - **Statistical Methods:** Correlation matrix, z-score outlier detection, income quartile segmentation  
+    - **Visualization:** Interactive dashboards with choropleths, bubble maps, dual-axis plots, and fairness analysis visuals  
+
+    ---
+
+    ###  **Unique Features**  
+    - Auto-loaded datasets (EV, Stations, Income, Population) for one-click exploration  
+    - Interactive filters for states and metrics  
+    - Built-in fairness and accessibility analysis by income group  
+
+    ---
+
+    ###  **Broader Impact**  
+    The analysis reveals that **EV adoption is not just a technological issue — it’s an equity challenge.**  
+    States with higher income and stronger policy support lead the transition, while others remain underserved.  
+    These insights can guide policymakers toward **balanced, inclusive infrastructure planning**.  
+
+    ---
+
+    ###  **Acknowledgment**  
+    *use of AI for technical assistance  from ChatGPT (OpenAI, GPT-5, 2025) for code generation, visualization structuring, and documentation support.*  
+    *All outputs were reviewed, validated, and modified manually to ensure originality and correctness.*  
+
+    ---
+
+    *“Data-driven insights for a sustainable, electric future.”* 
+    """)
 
 # ------------------------------------------------------------
 # Footer
