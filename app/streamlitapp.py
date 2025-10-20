@@ -35,8 +35,8 @@ DATA_PATHS = {
         "data/processed/ev_cleaned.csv",
         "data/processed/stations_state.csv",
         "data/processed/income_cleaned.csv",
-        "data/processed/ACSST1Y2024.S1903-Data.csv",
-        "data/processed/alt_fuel_stations.csv"
+        "data/raw/ACSST1Y2024.S1903-Data.csv",
+        # "data/processed/alt_fuel_stations.csv"
     ]
 }
 
