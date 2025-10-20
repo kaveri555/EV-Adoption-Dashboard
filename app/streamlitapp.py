@@ -1,5 +1,5 @@
 # ============================================================
-# EV Adoption Dashboard — With Summary Generator Integration
+# EV Adoption Dashboard — Streamlit Cloud Compatible Version
 # ============================================================
 
 import os
@@ -9,7 +9,6 @@ import streamlit as st
 import plotly.express as px
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy.stats import zscore
 import io
 
 # ------------------------------------------------------------
@@ -19,36 +18,51 @@ st.set_page_config(page_title="EV Adoption Insights", layout="wide", page_icon="
 st.title("🔋 Electric Vehicle Adoption Across U.S. States")
 
 # ------------------------------------------------------------
-# SIDEBAR
+# Sidebar
 # ------------------------------------------------------------
 with st.sidebar:
-    st.image("app/logo", use_container_width=True)
+    logo_path = "app/logo.png"
+    if os.path.exists(logo_path):
+        st.image(logo_path, use_container_width=True)
+    else:
+        st.image("https://upload.wikimedia.org/wikipedia/commons/e/e4/Electric_car_icon.png", use_container_width=True)
     st.title("EV-Adoption Dashboard")
     st.caption("Developed by Kaveri | CMSE 830")
 
 # ------------------------------------------------------------
-# File Paths
+# File Paths (relative for Streamlit Cloud)
 # ------------------------------------------------------------
 DATA_PATHS = {
-    "merged": [
-        "data/processed/ev_charging_income_state.csv",
-        "data/processed/ev_cleaned.csv",
-        "data/processed/stations_state.csv",
-        "data/processed/income_cleaned.csv",
-        "data/raw/ACSST1Y2024.S1903-Data.csv",
-    ]
+    "merged": ["data/processed/ev_charging_income_state.csv"]
 }
 
 # ------------------------------------------------------------
-# Helper Functions
+# Safe CSV Loader
 # ------------------------------------------------------------
+def safe_read_csv(file_path):
+    try:
+        df = pd.read_csv(file_path)
+    except Exception:
+        try:
+            df = pd.read_csv(file_path, encoding='utf-8-sig')
+        except Exception:
+            with open(file_path, 'rb') as f:
+                data = io.BytesIO(f.read())
+            df = pd.read_csv(data, encoding_errors='ignore')
+    return df
+
 def load_first_existing(paths):
     for p in paths:
         if os.path.exists(p):
-            return pd.read_csv(p)
-    st.error("❌ No data file found. Please check your data/processed folder.")
+            df = safe_read_csv(p)
+            st.success(f"✅ Loaded: {p} ({df.shape[0]} rows, {df.shape[1]} cols)")
+            return df
+    st.error("❌ Dataset not found. Please ensure CSV exists in 'data/processed/'.")
     st.stop()
 
+# ------------------------------------------------------------
+# Clean State Codes
+# ------------------------------------------------------------
 def clean_state_codes(df):
     USPS = {
         'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA','Colorado':'CO','Connecticut':'CT',
@@ -62,106 +76,76 @@ def clean_state_codes(df):
     }
 
     df = df.copy()
-    df["state"] = df["state"].str.strip()
-    df["state_usps"] = df["state"].map(USPS)
-    df = df.dropna(subset=["state_usps"])   # drop states with unmapped values
-    df["state_usps"] = df["state_usps"].str.upper()
+    if "state" in df.columns:
+        df["state"] = df["state"].astype(str).str.strip()
+        df["state_usps"] = df["state"].map(USPS)
+        df = df.dropna(subset=["state_usps"])
+        df["state_usps"] = df["state_usps"].str.upper()
     return df
 
 # ------------------------------------------------------------
-# Load Data
+# Load and Prepare Data
 # ------------------------------------------------------------
 df = load_first_existing(DATA_PATHS["merged"])
-if df is None:
-    st.error("❌ Merged dataset not found.")
+
+# Drop unnamed columns
+df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+
+# Diagnostic checks
+st.write("### Data Preview (Top 5 Rows)")
+st.dataframe(df.head())
+
+st.write("### Column Check")
+st.write(df.columns.tolist())
+
+st.write("### Null Values by Column")
+st.write(df.isnull().sum())
+
+# Ensure expected columns
+expected_cols = ['state', 'EV_Count', 'station_count', 'median_income']
+missing = [col for col in expected_cols if col not in df.columns]
+if missing:
+    st.error(f"❌ Missing columns in dataset: {missing}")
     st.stop()
+
+# Clean numeric columns
+for col in ['EV_Count', 'station_count', 'median_income']:
+    df[col] = (
+        df[col]
+        .astype(str)
+        .str.replace(',', '', regex=False)
+        .str.replace('$', '', regex=False)
+        .replace('', np.nan)
+        .astype(float)
+    )
 
 df = clean_state_codes(df)
 df["EV_per_station"] = df["EV_Count"] / df["station_count"].replace(0, np.nan)
 
 # ------------------------------------------------------------
-# Global Filters
+# Filters
 # ------------------------------------------------------------
 st.sidebar.markdown("### 🔍 Filters")
 
 state_list = sorted(df["state"].unique())
-selected_states = st.sidebar.multiselect(
-    "Select States to Include:", options=state_list, default=state_list
-)
+selected_states = st.sidebar.multiselect("Select States to Include:", options=state_list, default=state_list)
 
 min_income, max_income = int(df["median_income"].min()), int(df["median_income"].max())
-income_range = st.sidebar.slider(
-    "Select Median Income Range ($)", min_value=min_income, max_value=max_income,
-    value=(min_income, max_income), step=1000
-)
+income_range = st.sidebar.slider("Select Median Income Range ($)", min_value=min_income, max_value=max_income, value=(min_income, max_income), step=1000)
 
-df_filtered = df[
-    (df["state"].isin(selected_states)) &
-    (df["median_income"].between(income_range[0], income_range[1]))
-].copy()
+df_filtered = df[(df["state"].isin(selected_states)) & (df["median_income"].between(income_range[0], income_range[1]))].copy()
 
 st.sidebar.markdown("---")
 st.sidebar.info("Use filters above to interact with all dashboard tabs.")
 
 # ------------------------------------------------------------
-# 📄 Summary Report Generator Function
-# ------------------------------------------------------------
-def generate_summary_report(df):
-    buffer = io.StringIO()
-    print("="*70, file=buffer)
-    print("🔋 ELECTRIC VEHICLE ADOPTION — ANALYSIS SUMMARY REPORT", file=buffer)
-    print("="*70, file=buffer)
-    print(f"Total Records: {len(df)}", file=buffer)
-    print(f"Total States: {df['state'].nunique()}", file=buffer)
-    print("-"*70, file=buffer)
-
-    # Basic Statistics
-    key_cols = [c for c in ["EV_Count", "station_count", "median_income"] if c in df.columns]
-    if key_cols:
-        print("\n📈 BASIC DESCRIPTIVE STATISTICS\n", file=buffer)
-        desc = df[key_cols].describe().T.round(2)
-        print(desc, file=buffer)
-
-    # Correlation
-    corr_cols = [c for c in ["EV_Count", "station_count", "median_income", "EV_per_station"] if c in df.columns]
-    if corr_cols:
-        print("\n🔗 CORRELATION MATRIX\n", file=buffer)
-        corr = df[corr_cols].corr().round(2)
-        print(corr, file=buffer)
-
-    # Outliers
-    print("\n⚠️ OUTLIER SUMMARY (Z-Score > 3)\n", file=buffer)
-    z_df = df[key_cols].apply(lambda x: np.abs(zscore(x, nan_policy='omit')))
-    outlier_counts = (z_df > 3).sum()
-    print(outlier_counts, file=buffer)
-
-    # Fairness
-    if "Income_Q" in df.columns:
-        print("\n⚖️ FAIRNESS CHECK BY INCOME QUARTILE\n", file=buffer)
-        fairness = df.groupby("Income_Q")[key_cols].mean().round(2)
-        print(fairness, file=buffer)
-
-    # Insights
-    print("\n💡 INTERPRETATION & KEY INSIGHTS", file=buffer)
-    print("• High-income states show greater EV adoption and charger density.", file=buffer)
-    print("• Strong EV–Station correlation confirms infrastructure alignment.", file=buffer)
-    print("• Income significantly influences EV accessibility.", file=buffer)
-    print("="*70, file=buffer)
-
-    report_text = buffer.getvalue()
-    with open("EV_Analysis_Summary.txt", "w", encoding="utf-8") as f:
-        f.write(report_text)
-    return report_text
-
-# ------------------------------------------------------------
 # Tabs
 # ------------------------------------------------------------
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🌍 Geographic Overview",
     "📊 Trends & Distributions",
     "📈 Relationships & Correlations",
     "💵 Income & Accessibility",
-    "📄 Summary Report",
     "ℹ About"
 ])
 
@@ -172,14 +156,14 @@ with tab1:
     st.subheader("U.S. Map of EV Adoption and Infrastructure")
 
     fig_map = px.choropleth(
-    df_filtered,
-    locations="state_usps",
-    locationmode="USA-states",
-    scope="usa",
-    color="EV_Count",
-    color_continuous_scale="Viridis",
-    hover_data=["state", "EV_Count", "station_count", "median_income"]
-)
+        df_filtered,
+        locations="state_usps",
+        locationmode="USA-states",
+        scope="usa",
+        color="EV_Count",
+        color_continuous_scale="Viridis",
+        hover_data=["state", "EV_Count", "station_count", "median_income"]
+    )
     fig_map.update_layout(height=500, margin=dict(l=0, r=0, t=0, b=0))
     st.plotly_chart(fig_map, use_container_width=True)
 
@@ -198,17 +182,26 @@ with tab2:
     fig, axes = plt.subplots(3, 2, figsize=(12, 12))
     fig.tight_layout(pad=4.0)
 
-    sns.histplot(df_filtered["EV_Count"], bins=15, kde=True, color="teal", ax=axes[0,0])
-    sns.histplot(df_filtered["station_count"], bins=15, kde=True, color="orange", ax=axes[0,1])
-    sns.histplot(df_filtered["median_income"], bins=10, kde=True, color="purple", ax=axes[1,0])
+    sns.histplot(df_filtered["EV_Count"], bins=15, kde=True, color="teal", ax=axes[0, 0])
+    axes[0, 0].set_title("Distribution of EV Count Across States")
+
+    sns.histplot(df_filtered["station_count"], bins=15, kde=True, color="orange", ax=axes[0, 1])
+    axes[0, 1].set_title("Distribution of Charging Stations")
+
+    sns.histplot(df_filtered["median_income"], bins=10, kde=True, color="purple", ax=axes[1, 0])
+    axes[1, 0].set_title("Distribution of Median Household Income")
 
     top_evs = df_filtered.nlargest(10, "EV_Count")
-    sns.barplot(y="state", x="EV_Count", data=top_evs, ax=axes[1,1], palette="viridis")
+    sns.barplot(y="state", x="EV_Count", data=top_evs, ax=axes[1, 1], palette="viridis")
+    axes[1, 1].set_title("Top 10 States by EV Count")
 
     top_st = df_filtered.nlargest(10, "station_count")
-    sns.barplot(y="state", x="station_count", data=top_st, ax=axes[2,0], palette="crest")
+    sns.barplot(y="state", x="station_count", data=top_st, ax=axes[2, 0], palette="crest")
+    axes[2, 0].set_title("Top 10 States by Charging Stations")
 
-    sns.boxplot(data=df_filtered[["EV_Count","station_count","median_income"]], ax=axes[2,1])
+    sns.boxplot(data=df_filtered[["EV_Count", "station_count", "median_income"]], ax=axes[2, 1])
+    axes[2, 1].set_title("Outlier Overview (Boxplots)")
+
     st.pyplot(fig)
 
 # ------------------------------------------------------------
@@ -216,13 +209,21 @@ with tab2:
 # ------------------------------------------------------------
 with tab3:
     st.subheader("Interrelationships between EVs, Income, and Stations")
+
     fig2, axes = plt.subplots(1, 3, figsize=(15, 4))
     sns.regplot(data=df_filtered, x="median_income", y="EV_Count", ax=axes[0], color="navy")
+    axes[0].set_title("Income vs EV Count")
+
     sns.regplot(data=df_filtered, x="station_count", y="EV_Count", ax=axes[1], color="teal")
+    axes[1].set_title("Stations vs EV Count")
+
     sns.regplot(data=df_filtered, x="median_income", y="station_count", ax=axes[2], color="orange")
+    axes[2].set_title("Income vs Stations")
+
     st.pyplot(fig2)
+
     st.write("#### Correlation Matrix")
-    corr = df_filtered[["EV_Count","station_count","median_income"]].corr()
+    corr = df_filtered[["EV_Count", "station_count", "median_income"]].corr()
     st.dataframe(corr.style.background_gradient(cmap="coolwarm").format("{:.2f}"))
 
 # ------------------------------------------------------------
@@ -230,32 +231,18 @@ with tab3:
 # ------------------------------------------------------------
 with tab4:
     st.subheader("Equity Analysis: Charging Access by Income Quartiles")
-    df_filtered["Income_Q"] = pd.qcut(df_filtered["median_income"], 4, labels=["Q1 (Low)","Q2","Q3","Q4 (High)"])
-    fig3, ax = plt.subplots(figsize=(8,5))
+    df_filtered["Income_Q"] = pd.qcut(df_filtered["median_income"], 4, labels=["Q1 (Low)", "Q2", "Q3", "Q4 (High)"])
+    fig3, ax = plt.subplots(figsize=(8, 5))
     sns.boxplot(x="Income_Q", y="station_count", data=df_filtered, palette="Blues", ax=ax)
+    ax.set_title("Charging Station Availability by Income Quartile")
     st.pyplot(fig3)
 
 # ------------------------------------------------------------
-# 📄 Summary Report (NEW)
+# 5️⃣ About
 # ------------------------------------------------------------
 with tab5:
-    st.subheader("📄 Automated EV Summary Report")
-    if st.button("🧩 Generate Summary Report"):
-        report_text = generate_summary_report(df_filtered)
-        st.text_area("Summary Output", report_text, height=400)
-        st.download_button(
-            label="💾 Download EV Summary Report",
-            data=report_text,
-            file_name="EV_Analysis_Summary.txt",
-            mime="text/plain"
-        )
-
-# ------------------------------------------------------------
-# ℹ️ About
-# ------------------------------------------------------------
-with tab6:
     st.markdown("""
-    ## ℹ About This Dashboard  
+    ## ℹ ## ℹ About This Dashboard  
 
     **Project Title:** *Electric Vehicle (EV) Adoption and Charging Infrastructure Analysis Across U.S. States*  
     **Course:** *CMSE 830 
@@ -318,7 +305,6 @@ with tab6:
 
     *“Data-driven insights for a sustainable, electric future.”* 
     """)
-
 
 # ------------------------------------------------------------
 # Footer
