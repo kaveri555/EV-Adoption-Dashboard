@@ -22,7 +22,7 @@ st.title("🔋 Electric Vehicle Adoption Across U.S. States")
 # SIDEBAR
 # ------------------------------------------------------------
 with st.sidebar:
-    st.image(r"C:\Users\palicher\Downloads\logo", use_container_width=True)
+    st.image("app/logo.png", use_container_width=True)
     st.title("EV-Adoption Dashboard")
     st.caption("Developed by Kaveri | CMSE 830")
 
@@ -31,8 +31,12 @@ with st.sidebar:
 # ------------------------------------------------------------
 DATA_PATHS = {
     "merged": [
-        r"C:\Users\palicher\Downloads\DATA\processed\ev_charging_income_state.csv",
-        "/mnt/data/ev_charging_income_state.csv"
+        "data/processed/ev_charging_income_state.csv",
+        "data/processed/ev_cleaned.csv",
+        "data/processed/stations_state.csv",
+        "data/processed/income_cleaned.csv",
+        "data/processed/ACSST1Y2024.S1903-Data.csv",
+        "data/processed/alt_fuel_stations.csv"
     ]
 }
 
@@ -43,7 +47,8 @@ def load_first_existing(paths):
     for p in paths:
         if os.path.exists(p):
             return pd.read_csv(p)
-    return None
+    st.error("❌ No data file found. Please check your data/processed folder.")
+    st.stop()
 
 def clean_state_codes(df):
     USPS = {
