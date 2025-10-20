@@ -26,7 +26,10 @@ with st.sidebar:
     if os.path.exists(logo_path):
         st.image(logo_path, use_container_width=True)
     else:
-        st.image("https://upload.wikimedia.org/wikipedia/commons/e/e4/Electric_car_icon.png", use_container_width=True)
+        st.image(
+            "https://upload.wikimedia.org/wikipedia/commons/e/e4/Electric_car_icon.png",
+            use_container_width=True,
+        )
     st.title("EV-Adoption Dashboard")
     st.caption("Developed by Kaveri | CMSE 830")
 
@@ -55,16 +58,60 @@ def load_first_existing(paths):
     st.error("❌ No data file found. Please check your data/processed folder.")
     st.stop()
 
+
 def clean_state_codes(df):
     USPS = {
-        'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA','Colorado':'CO','Connecticut':'CT',
-        'Delaware':'DE','District of Columbia':'DC','Florida':'FL','Georgia':'GA','Hawaii':'HI','Idaho':'ID','Illinois':'IL',
-        'Indiana':'IN','Iowa':'IA','Kansas':'KS','Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD',
-        'Massachusetts':'MA','Michigan':'MI','Minnesota':'MN','Mississippi':'MS','Missouri':'MO','Montana':'MT',
-        'Nebraska':'NE','Nevada':'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY',
-        'North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK','Oregon':'OR','Pennsylvania':'PA',
-        'Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT',
-        'Vermont':'VT','Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI','Wyoming':'WY'
+        "Alabama": "AL",
+        "Alaska": "AK",
+        "Arizona": "AZ",
+        "Arkansas": "AR",
+        "California": "CA",
+        "Colorado": "CO",
+        "Connecticut": "CT",
+        "Delaware": "DE",
+        "District of Columbia": "DC",
+        "Florida": "FL",
+        "Georgia": "GA",
+        "Hawaii": "HI",
+        "Idaho": "ID",
+        "Illinois": "IL",
+        "Indiana": "IN",
+        "Iowa": "IA",
+        "Kansas": "KS",
+        "Kentucky": "KY",
+        "Louisiana": "LA",
+        "Maine": "ME",
+        "Maryland": "MD",
+        "Massachusetts": "MA",
+        "Michigan": "MI",
+        "Minnesota": "MN",
+        "Mississippi": "MS",
+        "Missouri": "MO",
+        "Montana": "MT",
+        "Nebraska": "NE",
+        "Nevada": "NV",
+        "New Hampshire": "NH",
+        "New Jersey": "NJ",
+        "New Mexico": "NM",
+        "New York": "NY",
+        "North Carolina": "NC",
+        "North Dakota": "ND",
+        "Ohio": "OH",
+        "Oklahoma": "OK",
+        "Oregon": "OR",
+        "Pennsylvania": "PA",
+        "Rhode Island": "RI",
+        "South Carolina": "SC",
+        "South Dakota": "SD",
+        "Tennessee": "TN",
+        "Texas": "TX",
+        "Utah": "UT",
+        "Vermont": "VT",
+        "Virginia": "VA",
+        "Washington": "WA",
+        "West Virginia": "WV",
+        "Wisconsin": "WI",
+        "Wyoming": "WY",
     }
 
     df = df.copy()
@@ -74,6 +121,7 @@ def clean_state_codes(df):
         df = df.dropna(subset=["state_usps"])
         df["state_usps"] = df["state_usps"].str.upper()
     return df
+
 
 # ------------------------------------------------------------
 # Load Data
@@ -97,8 +145,8 @@ for col in ["EV_Count", "station_count", "median_income"]:
             .str.replace(",", "", regex=False)
             .str.replace("$", "", regex=False)
             .replace("", np.nan)
-            .astype(float)
         )
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
 if "median_income" in df.columns:
     df["median_income"].fillna(df["median_income"].median(), inplace=True)
@@ -113,7 +161,17 @@ selected_states = st.sidebar.multiselect(
     "Select States to Include:", options=state_list, default=state_list
 )
 
-min_income, max_income = int(df["median_income"].min()), int(df["median_income"].max())
+# --- Final safety net for income column ---
+df["median_income"] = pd.to_numeric(df["median_income"], errors="coerce")
+df = df.dropna(subset=["median_income"])
+
+if df["median_income"].empty:
+    st.error("❌ No valid median income values found. Please verify dataset.")
+    st.stop()
+
+min_income = int(df["median_income"].min())
+max_income = int(df["median_income"].max())
+
 income_range = st.sidebar.slider(
     "Select Median Income Range ($)",
     min_value=min_income,
@@ -142,33 +200,28 @@ def generate_summary_report(df):
     print(f"Total States: {df['state'].nunique()}", file=buffer)
     print("-" * 70, file=buffer)
 
-    # Basic Statistics
     key_cols = [c for c in ["EV_Count", "station_count", "median_income"] if c in df.columns]
     if key_cols:
         print("\n📈 BASIC DESCRIPTIVE STATISTICS\n", file=buffer)
         desc = df[key_cols].describe().T.round(2)
         print(desc, file=buffer)
 
-    # Correlation
     corr_cols = [c for c in ["EV_Count", "station_count", "median_income", "EV_per_station"] if c in df.columns]
     if corr_cols:
         print("\n🔗 CORRELATION MATRIX\n", file=buffer)
         corr = df[corr_cols].corr().round(2)
         print(corr, file=buffer)
 
-    # Outliers
     print("\n⚠️ OUTLIER SUMMARY (Z-Score > 3)\n", file=buffer)
     z_df = df[key_cols].apply(lambda x: np.abs(zscore(x, nan_policy="omit")))
     outlier_counts = (z_df > 3).sum()
     print(outlier_counts, file=buffer)
 
-    # Fairness
     if "Income_Q" in df.columns:
         print("\n⚖️ FAIRNESS CHECK BY INCOME QUARTILE\n", file=buffer)
         fairness = df.groupby("Income_Q")[key_cols].mean().round(2)
         print(fairness, file=buffer)
 
-    # Insights
     print("\n💡 INTERPRETATION & KEY INSIGHTS", file=buffer)
     print("• High-income states show greater EV adoption and charger density.", file=buffer)
     print("• Strong EV–Station correlation confirms infrastructure alignment.", file=buffer)
@@ -179,6 +232,7 @@ def generate_summary_report(df):
     with open("EV_Analysis_Summary.txt", "w", encoding="utf-8") as f:
         f.write(report_text)
     return report_text
+
 
 # ------------------------------------------------------------
 # Tabs
@@ -285,7 +339,8 @@ with tab5:
 # ℹ️ About
 # ------------------------------------------------------------
 with tab6:
-    st.markdown("""
+    st.markdown(
+        """
     ## ℹ About This Dashboard  
 
     **Project Title:** *Electric Vehicle (EV) Adoption and Charging Infrastructure Analysis Across U.S. States*  
@@ -299,10 +354,13 @@ with tab6:
 
     ---
     *Data-driven insights for a sustainable, electric future.*
-    """)
+    """
+    )
 
 # ------------------------------------------------------------
 # Footer
 # ------------------------------------------------------------
 st.markdown("---")
-st.caption("Visualization app automatically loads merged EV dataset and generates descriptive, distributional, and relational insights.")
+st.caption(
+    "Visualization app automatically loads merged EV dataset and generates descriptive, distributional, and relational insights."
+)
