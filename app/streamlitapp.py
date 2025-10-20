@@ -22,7 +22,7 @@ st.title("🔋 Electric Vehicle Adoption Across U.S. States")
 # SIDEBAR
 # ------------------------------------------------------------
 with st.sidebar:
-    st.image("app/logo", use_container_width=True)
+    st.image("app/logo.png", use_container_width=True)
     st.title("EV-Adoption Dashboard")
     st.caption("Developed by Kaveri | CMSE 830")
 
@@ -36,7 +36,6 @@ DATA_PATHS = {
         "data/processed/stations_state.csv",
         "data/processed/income_cleaned.csv",
         "data/raw/ACSST1Y2024.S1903-Data.csv",
-        # "data/processed/alt_fuel_stations.csv"
     ]
 }
 
@@ -61,9 +60,12 @@ def clean_state_codes(df):
         'Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT',
         'Vermont':'VT','Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI','Wyoming':'WY'
     }
+
     df = df.copy()
-    if "state_usps" not in df.columns:
-        df["state_usps"] = df["state"].map(USPS)
+    df["state"] = df["state"].str.strip()
+    df["state_usps"] = df["state"].map(USPS)
+    df = df.dropna(subset=["state_usps"])   # drop states with unmapped values
+    df["state_usps"] = df["state_usps"].str.upper()
     return df
 
 # ------------------------------------------------------------
@@ -170,14 +172,14 @@ with tab1:
     st.subheader("U.S. Map of EV Adoption and Infrastructure")
 
     fig_map = px.choropleth(
-        df_filtered,
-        locations="state_usps",
-        locationmode="USA-states",
-        scope="usa",
-        color="EV_Count",
-        color_continuous_scale="Viridis",
-        hover_data=["state", "EV_Count", "station_count", "median_income"]
-    )
+    df_filtered,
+    locations="state_usps",
+    locationmode="USA-states",
+    scope="usa",
+    color="EV_Count",
+    color_continuous_scale="Viridis",
+    hover_data=["state", "EV_Count", "station_count", "median_income"]
+)
     fig_map.update_layout(height=500, margin=dict(l=0, r=0, t=0, b=0))
     st.plotly_chart(fig_map, use_container_width=True)
 
