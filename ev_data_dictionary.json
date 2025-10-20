@@ -1,0 +1,76 @@
+{
+  "state": {
+    "type": "category",
+    "description": "US state/territory code or name"
+  },
+  "population": {
+    "type": "float64",
+    "description": "Population",
+    "unit": "people",
+    "range": "5.78e+05\u20133.95e+07",
+    "mean": 6984786.568181818
+  },
+  "median_income": {
+    "type": "float64",
+    "description": "Median household income",
+    "unit": "USD",
+    "range": "5.91e+04\u20131.1e+05",
+    "mean": 82580.8
+  },
+  "null": {
+    "type": "float64",
+    "description": "EV registrations",
+    "unit": "vehicles",
+    "range": "n/a",
+    "mean": null
+  },
+  "station_count": {
+    "type": "int64",
+    "description": "Total charging stations (or EVSE ports)",
+    "unit": "count",
+    "range": "20\u2013592",
+    "mean": 90.66666666666667
+  },
+  "EV_per_1000_pop": {
+    "type": "float64",
+    "description": "EV per 1,000 residents",
+    "unit": "EVs/1k",
+    "range": "0\u20132.8",
+    "mean": 0.1469691111519708
+  },
+  "Stations_per_100k_pop": {
+    "type": "float64",
+    "description": "Stations per 100,000 residents",
+    "unit": "stations/100k",
+    "range": "0.561\u20135.64",
+    "mean": 1.8863343977005145
+  },
+  "EV_per_station": {
+    "type": "float64",
+    "description": "EVs per station (load ratio)",
+    "unit": "EVs/station",
+    "range": "0\u2013168",
+    "mean": 8.680645645235082
+  },
+  "DC_share": {
+    "type": "float64",
+    "description": "Share of stations that are DC fast",
+    "unit": "fraction",
+    "range": "nan\u2013nan",
+    "mean": NaN
+  },
+  "Income_Index": {
+    "type": "float64",
+    "description": "Income relative to state mean (=1 at mean)",
+    "unit": "index",
+    "range": "0.716\u20131.33",
+    "mean": 1.0
+  },
+  "EV_Growth": {
+    "type": "float64",
+    "description": "YoY growth in EV count",
+    "unit": "fraction",
+    "range": "nan\u2013nan",
+    "mean": NaN
+  }
+}
