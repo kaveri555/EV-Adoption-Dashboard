@@ -209,9 +209,9 @@ pip install -r requirements.txt
 # Run the Streamlit app
 streamlit run app/app.py
 
-Streamlit App (Deployed Online)
+Streamlit App (Deployed Online) 
 
-# Live Dashboard: 
+# Live Dashboard: https://ev-adoption-dashboard.streamlit.app/
 
 The online dashboard allows users to explore EV adoption, charger density, income correlation, fairness insights, and a downloadable automated summary report.
 
