@@ -22,7 +22,7 @@ st.title("🔋 Electric Vehicle Adoption Across U.S. States")
 # SIDEBAR
 # ------------------------------------------------------------
 with st.sidebar:
-    logo_path = "app/logo.png"
+    logo_path = "app/logo"
     if os.path.exists(logo_path):
         st.image(logo_path, use_container_width=True)
     else:
