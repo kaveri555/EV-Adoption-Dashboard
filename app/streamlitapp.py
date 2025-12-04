@@ -1927,5 +1927,5 @@ with tab_about:
 # ------------------------------------------------------------
 st.markdown("---")
 st.caption(
-    "This app integrates data wrangling, EDA, ML, fairness, and interpretability into a single EV adoption dashboard."
+    "This app integrates data wrangling, EDA, ML, fairness, and interpretability into a single EV adoption dashboard into."
 )
