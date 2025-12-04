@@ -918,38 +918,187 @@ with tab_dict:
     st.dataframe(dd_df)
 
 # ------------------------------------------------------------
-# 🧹 3. Data Quality & Imputation
+# 🧹 3. Data Quality & Imputation (detailed)
 # ------------------------------------------------------------
 with tab_quality:
     st.markdown("You are here → **🧹 Data Quality & Imputation**")
-    st.info("Shows missingness, simple imputation, and KNN-imputed frame (df_knn).")
+    st.info(
+        "This tab shows where the data had gaps, how much was imputed, and how KNN imputation "
+        "changes the distributions of key variables."
+    )
 
     raw = df_base.copy()
     knn = df_knn.copy()
 
-    # Missingness
-    st.subheader("Missingness overview (raw master)")
-    na_frac = raw.isna().mean().sort_values(ascending=False)
-    st.dataframe(na_frac.to_frame("missing_fraction").style.format("{:.2f}"))
+    # 1️⃣ Missingness summary: raw vs KNN-imputed
+    st.subheader("1. Missing data overview (Raw vs Imputed)")
 
-    fig, ax = plt.subplots(figsize=(8, 4))
-    na_frac[na_frac > 0].plot(kind="bar", ax=ax)
-    ax.set_ylabel("Fraction missing")
-    ax.set_title("Missingness by column (non-zero only)")
-    plt.xticks(rotation=45, ha="right")
-    st.pyplot(fig)
-    plt.close(fig)
+    missing_raw = raw.isna().sum().sort_values(ascending=False)
+    missing_knn = knn.isna().sum()
+    missing_knn = missing_knn.reindex(missing_raw.index)  # align indices
 
-    st.subheader("Simple vs KNN imputation ✨")
-    st.markdown(
-        """
-        - **Simple imputation**: median for numeric, mode for categorical.  
-        - **KNN imputation**: each missing value inferred from similar states.  
-        """
+    missing_df = pd.DataFrame({
+        "Missing (raw)": missing_raw,
+        "Missing % (raw)": (missing_raw / len(raw)).round(3),
+        "Missing (imputed)": missing_knn,
+        "Missing % (imputed)": (missing_knn / len(knn)).round(3),
+    })
+
+    st.caption("Columns with the most missing values before and after KNN imputation.")
+    st.dataframe(
+        missing_df[missing_df["Missing (raw)"] > 0]
+        .head(30)
+        .style.format({"Missing % (raw)": "{:.3f}", "Missing % (imputed)": "{:.3f}"})
     )
 
-    st.write("Shape of KNN-imputed frame:", knn.shape)
-    st.write("Any NAs left in df_knn?", bool(knn.isna().any().any()))
+    # Bar chart of missingness (raw only, non-zero)
+    nonzero_missing = missing_raw[missing_raw > 0]
+    if not nonzero_missing.empty:
+        st.markdown("#### Missing values by column (raw data)")
+        fig_miss, ax_miss = plt.subplots(figsize=(8, 4))
+        nonzero_missing.plot(kind="bar", ax=ax_miss)
+        ax_miss.set_ylabel("Count of missing values")
+        ax_miss.set_title("Missingness by column (raw dataset)")
+        ax_miss.tick_params(axis="x", rotation=45)
+        st.pyplot(fig_miss)
+        plt.close(fig_miss)
+    else:
+        st.success("✅ No missing values in the raw merged dataset.")
+
+    st.markdown("---")
+
+    # 2️⃣ Missingness pattern heatmap (for top columns)
+    st.subheader("2. Missingness pattern (raw dataset)")
+
+    # Take up to 20 columns with the most missing values
+    top_missing_cols = missing_raw[missing_raw > 0].index.tolist()[:20]
+    if top_missing_cols:
+        st.caption("Heatmap shows where rows had missing values (yellow = missing).")
+        fig_heat, ax_heat = plt.subplots(figsize=(10, 4))
+        sns.heatmap(
+            raw[top_missing_cols].isna(),
+            cbar=False,
+            ax=ax_heat,
+            yticklabels=False,
+        )
+        ax_heat.set_xlabel("Columns")
+        ax_heat.set_title("Missingness pattern across top-missing columns (raw)")
+        ax_heat.tick_params(axis="x", rotation=45)
+        st.pyplot(fig_heat)
+        plt.close(fig_heat)
+    else:
+        st.info("No columns with missing values to display in a pattern heatmap.")
+
+    st.markdown("---")
+
+    # 3️⃣ Distribution before vs after imputation (select a variable)
+    st.subheader("3. Distribution before vs after KNN imputation")
+
+    # numeric columns present in both raw and knn
+    numeric_common = [
+        c for c in raw.columns
+        if c in knn.columns and pd.api.types.is_numeric_dtype(raw[c])
+    ]
+
+    # Prefer “interesting” variables near the top
+    preferred_order = [
+        "EV_per_1000",
+        "Stations_per_100k",
+        "EV_Count",
+        "station_count",
+        "median_income",
+        "policy",
+        "renewable_share",
+        "charger_gap",
+    ]
+    ordered_numeric = [c for c in preferred_order if c in numeric_common] + [
+        c for c in numeric_common if c not in preferred_order
+    ]
+
+    if not ordered_numeric:
+        st.warning("No numeric columns found in common between raw and imputed datasets.")
+    else:
+        col_choice = st.selectbox(
+            "Choose a numeric variable to compare (raw vs imputed):",
+            ordered_numeric,
+        )
+
+        raw_col = raw[col_choice]
+        knn_col = knn[col_choice]
+
+        col1, col2 = st.columns(2)
+
+        # Histograms side by side
+        with col1:
+            st.markdown(f"**Raw distribution — {col_choice}**")
+            fig_raw, ax_raw = plt.subplots(figsize=(4, 3))
+            sns.histplot(raw_col.dropna(), kde=True, ax=ax_raw)
+            ax_raw.set_xlabel(col_choice)
+            ax_raw.set_ylabel("Count")
+            st.pyplot(fig_raw)
+            plt.close(fig_raw)
+
+        with col2:
+            st.markdown(f"**Imputed distribution — {col_choice}**")
+            fig_imp, ax_imp = plt.subplots(figsize=(4, 3))
+            sns.histplot(knn_col.dropna(), kde=True, ax=ax_imp)
+            ax_imp.set_xlabel(col_choice)
+            ax_imp.set_ylabel("Count")
+            st.pyplot(fig_imp)
+            plt.close(fig_imp)
+
+        # Small numeric summary
+        summary_df = pd.DataFrame(
+            {
+                "Raw (mean)": [raw_col.mean()],
+                "Imputed (mean)": [knn_col.mean()],
+                "Raw (median)": [raw_col.median()],
+                "Imputed (median)": [knn_col.median()],
+                "Raw (std)": [raw_col.std()],
+                "Imputed (std)": [knn_col.std()],
+            }
+        ).T.rename(columns={0: "value"}).round(3)
+
+        st.caption("Summary stats before vs after imputation:")
+        st.dataframe(summary_df)
+
+    st.markdown("---")
+
+    # 4️⃣ Boxplot comparison for multiple key variables
+    st.subheader("4. Boxplot comparison of key variables (Raw vs Imputed)")
+
+    key_vars = [c for c in ["EV_per_1000", "Stations_per_100k", "median_income", "policy"] if c in numeric_common]
+    if key_vars:
+        # Build long-format dataframe
+        long_rows = []
+        for c in key_vars:
+            long_rows.append(
+                pd.DataFrame(
+                    {"value": raw[c], "variable": c, "dataset": "Raw"}
+                )
+            )
+            long_rows.append(
+                pd.DataFrame(
+                    {"value": knn[c], "variable": c, "dataset": "Imputed (KNN)"}
+                )
+            )
+        long_df = pd.concat(long_rows, ignore_index=True).dropna(subset=["value"])
+
+        fig_box, ax_box = plt.subplots(figsize=(8, 4))
+        sns.boxplot(
+            data=long_df,
+            x="variable",
+            y="value",
+            hue="dataset",
+            ax=ax_box,
+        )
+        ax_box.set_title("Boxplot of key variables: Raw vs Imputed (KNN)")
+        ax_box.tick_params(axis="x", rotation=45)
+        st.pyplot(fig_box)
+        plt.close(fig_box)
+    else:
+        st.info("Key comparison vars (EV_per_1000, Stations_per_100k, etc.) not all present; skipping boxplot.")
+
 
 # ------------------------------------------------------------
 # 🌍 4. Geographic View (Map + Bubble)
