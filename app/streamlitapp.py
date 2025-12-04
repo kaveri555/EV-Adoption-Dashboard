@@ -1915,7 +1915,7 @@ with tab_about:
         - Add formal statistical tests (ANOVA, regression coefficients) directly into the UI.
 
         ---
-        ##  Use of AI Assistance  
+        ## Use of AI Assistance  
 
         Parts of this dashboard (code scaffolding, refactoring, and wording suggestions) were  
         assisted by AI tools (ChatGPT5, OpenAI, 2025).
