@@ -907,7 +907,8 @@ with tab_regions:
         radar_df = model_df[model_df["state"].isin(states_to_plot)].set_index("state")[radar_vars]
         if not radar_df.empty:
             # normalize 0-1
-            radar_norm = (radar_df - radar_df.min()) / (radar_df.max() - radar_df.max().min() + 1e-9)
+             # normalize 0–1 column-wise
+             radar_norm = (radar_df - radar_df.min()) / (radar_df.max() - radar_df.min() + 1e-9)
             from math import pi
             labels = radar_vars
             angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
@@ -930,18 +931,35 @@ with tab_regions:
             plt.close(fig_r)
 
         # PCA scatter with clusters
-        st.subheader("PCA scatter with clusters")
-        scatter_df = model_df.dropna(subset=["PC1","PC2"])
-        if not scatter_df.empty:
-            fig_pca = px.scatter(
-                scatter_df,
-                x="PC1",
-                y="PC2",
-                color="cluster" if "cluster" in scatter_df.columns else None,
-                hover_name="state",
-                hover_data=["EV_per_1000","Stations_per_100k","median_income","policy"] if "EV_per_1000" in scatter_df.columns else ["median_income"],
-            )
-            st.plotly_chart(fig_pca, use_container_width=True)
+st.subheader("PCA scatter with clusters")
+scatter_df = model_df.dropna(subset=["PC1", "PC2"])
+
+if not scatter_df.empty:
+    # Build hover_data safely based on existing columns
+    hover_candidates = [
+        "EV_per_1000",
+        "Stations_per_100k",
+        "median_income",
+        "policy",
+        "EV_Count",
+        "station_count",
+    ]
+    hover_cols = [c for c in hover_candidates if c in scatter_df.columns]
+
+    fig_pca = px.scatter(
+        scatter_df,
+        x="PC1",
+        y="PC2",
+        color="cluster" if "cluster" in scatter_df.columns else None,
+        hover_name="state" if "state" in scatter_df.columns else None,
+        hover_data=hover_cols,
+        labels={"PC1": "Principal Component 1", "PC2": "Principal Component 2"},
+        title="PCA of EV Adoption & Infrastructure Features by State",
+    )
+    fig_pca.update_layout(margin=dict(l=0, r=0, t=40, b=0))
+    st.plotly_chart(fig_pca, use_container_width=True)
+else:
+    st.info("No rows with valid PC1/PC2 to plot.")
 
 # ------------------------------------------------------------
 # 🔮 8. Predictive Models (Regression + Classification)
