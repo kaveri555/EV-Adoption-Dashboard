@@ -622,6 +622,108 @@ with tab_home:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("EV_per_1000 not available; computed per-pop metrics may be in another file.")
+        # ------------------ New: Flexible EDA comparison tool ------------------
+    st.markdown("---")
+    st.subheader("Exploratory comparisons (pick any metrics)")
+
+    st.markdown(
+        "Use the selectors below to compare EV adoption or infrastructure metrics "
+        "against income, population, policy, renewable share, or charger gap."
+    )
+
+    # Y-axis options: outcomes / adoption metrics
+    y_choices = {}
+    if "EV_per_1000" in df_filtered.columns:
+        y_choices["EV per 1,000 residents"] = "EV_per_1000"
+    if "EV_Count" in df_filtered.columns:
+        y_choices["Total EV count"] = "EV_Count"
+    if "station_count" in df_filtered.columns:
+        y_choices["Number of charging stations"] = "station_count"
+    if "Stations_per_100k" in df_filtered.columns:
+        y_choices["Stations per 100k residents"] = "Stations_per_100k"
+    if "EV_per_station" in df_filtered.columns:
+        y_choices["EVs per station"] = "EV_per_station"
+
+    # X-axis options: drivers / context metrics
+    x_choices = {}
+    if "population" in df_filtered.columns:
+        x_choices["Population (ACS)"] = "population"
+    if "median_income" in df_filtered.columns:
+        x_choices["Median household income ($)"] = "median_income"
+    if "policy" in df_filtered.columns:
+        x_choices["Policy support score"] = "policy"
+    if "renewable_share" in df_filtered.columns:
+        x_choices["Renewable energy share (%)"] = "renewable_share"
+    if "charger_gap" in df_filtered.columns:
+        x_choices["Charger gap (ideal − actual stations)"] = "charger_gap"
+
+    if not y_choices or not x_choices:
+        st.info(
+            "Not enough numeric columns to build comparisons. "
+            "Need at least one EV/adoption metric and one driver metric "
+            "(population, income, policy, renewable, or charger_gap)."
+        )
+    else:
+        y_label = st.selectbox(
+            "Y-axis: outcome / adoption metric",
+            list(y_choices.keys()),
+            index=0,
+        )
+        x_label = st.selectbox(
+            "X-axis: driver / context metric",
+            list(x_choices.keys()),
+            index=min(1, len(x_choices) - 1),  # try not to pick the first one twice
+        )
+
+        y_col = y_choices[y_label]
+        x_col = x_choices[x_label]
+
+        comp_df = df_filtered.dropna(subset=[x_col, y_col]).copy()
+
+        if comp_df.empty:
+            st.warning(
+                "No non-missing values for this comparison with current filters. "
+                "Try changing the filters or choosing different metrics."
+            )
+        else:
+            hover_candidates = [
+                "EV_per_1000",
+                "EV_Count",
+                "station_count",
+                "Stations_per_100k",
+                "median_income",
+                "policy",
+                "population",
+                "charger_gap",
+                "renewable_share",
+            ]
+            hover_cols = [
+                c
+                for c in hover_candidates
+                if c in comp_df.columns and c not in [x_col, y_col]
+            ]
+
+            fig_comp = px.scatter(
+                comp_df,
+                x=x_col,
+                y=y_col,
+                color="region" if "region" in comp_df.columns else None,
+                hover_name="state" if "state" in comp_df.columns else None,
+                hover_data=hover_cols,
+                labels={x_col: x_label, y_col: y_label},
+                title=f"{y_label} vs {x_label}",
+            )
+            fig_comp.update_traces(marker=dict(size=10, opacity=0.8))
+            st.plotly_chart(fig_comp, use_container_width=True)
+
+            # Simple correlation note (if we have enough points)
+            if comp_df[[x_col, y_col]].dropna().shape[0] >= 3:
+                corr_val = comp_df[[x_col, y_col]].corr().iloc[0, 1]
+                st.caption(
+                    f"Pearson correlation between **{x_label}** and **{y_label}**: "
+                    f"`{corr_val:.2f}` (sign and magnitude only, not causation)."
+                )
+
 
     st.markdown("---")
     with st.expander("🧩 Quick summary report (text)", expanded=False):
