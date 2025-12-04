@@ -837,43 +837,53 @@ with tab_home:
         )
 
 # ------------------------------------------------------------
-# 📁 1. Dataset Viewer
+# 📁 1. Dataset Viewer — Clean Naming
 # ------------------------------------------------------------
 with tab_viewer:
     st.markdown("You are here → **📁 Dataset Viewer**")
-    st.info("View raw/processed tables and download filtered copies.")
+    st.info("Browse the datasets used throughout the dashboard and download them if needed.")
 
     dataset_choice = st.radio(
         "Choose dataset to view:",
         [
-            "Filtered master (current view)",
-            "Full master (all states)",
-            "Modeling frame (df_knn)",
-            "State-year EV stats (if available)",
+            "Current Filtered Data",
+            "Complete EV Dataset",
+            "Imputed Dataset (KNN Cleaned)",
+            "EV Trends Over Time",
         ],
         horizontal=True,
     )
 
-    if dataset_choice == "Filtered master (current view)":
-        df_view = df_filtered
-    elif dataset_choice == "Full master (all states)":
-        df_view = df_base
-    elif dataset_choice == "Modeling frame (df_knn)":
-        df_view = df_knn
-    else:
-        df_view = state_year_df if state_year_df is not None else pd.DataFrame()
+    # Map user selection → actual dataframe
+    if dataset_choice == "Current Filtered Data":
+        df_view = df_filtered.copy()
+        st.caption("Showing the dataset after applying sidebar filters.")
 
+    elif dataset_choice == "Complete EV Dataset":
+        df_view = df_base.copy()
+        st.caption("Full merged dataset of EV counts, stations, income, energy, and policy.")
+
+    elif dataset_choice == "Imputed Dataset (KNN Cleaned)":
+        df_view = df_knn.copy()
+        st.caption("This version has missing values filled using KNN imputation — used for ML models.")
+
+    else:  # "EV Trends Over Time"
+        df_view = state_year_df.copy() if state_year_df is not None else pd.DataFrame()
+        st.caption("Year-over-year EV registration data by state.")
+
+    # Show the dataset
     if df_view is None or df_view.empty:
         st.warning("No data available for this dataset.")
     else:
-        st.write(f"Shape: **{df_view.shape[0]} rows × {df_view.shape[1]} columns**")
+        st.write(f"**Rows:** {df_view.shape[0]}  **Columns:** {df_view.shape[1]}")
         st.dataframe(df_view.head(200))
 
+        # Download button
         csv_bytes = df_view.to_csv(index=False).encode("utf-8")
         st.download_button(
-            "💾 Download this dataset as CSV",
+            "⬇️ Download CSV",
             data=csv_bytes,
-            file_name="ev_dataset_export.csv",
+            file_name=f"{dataset_choice.replace(' ', '_').lower()}.csv",
             mime="text/csv",
         )
 
