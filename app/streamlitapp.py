@@ -1091,7 +1091,7 @@ with tab_quality:
 
         st.caption(
             "Because missingness is low, the raw and KNN-imputed boxplots overlap strongly — "
-            "which is what we want: imputation should *fix gaps* without distorting the signal."
+            " imputation should *fix gaps* without distorting the signal."
         )
     else:
         st.info("Key comparison vars (EV_per_1000, Stations_per_100k, etc.) not all present; skipping boxplot.")
