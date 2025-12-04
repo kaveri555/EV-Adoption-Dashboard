@@ -1684,46 +1684,58 @@ with tab_fairness:
             else:
                 group_by = st.selectbox("Group fairness by:", group_options)
 
-                # Evaluate on all states (not split)
-                X_all = model_df[feature_cols_reg].astype(float)
-                y_all = model_df["high_ev"].astype(int)
-                y_pred_all = rf_model.predict(X_all)
+                               
 
-                model_df["pred_high_ev"] = y_pred_all
-
-                rows = []
-                for g, sub in model_df.groupby(group_by):
-                    if len(sub) < 3:
-                        continue
-                    acc_g = accuracy_score(sub["high_ev"], sub["pred_high_ev"])
-                    f1_g = f1_score(sub["high_ev"], sub["pred_high_ev"])
-                    rows.append({"group": str(g), "n_states": len(sub), "accuracy": acc_g, "f1": f1_g})
-
-                if rows:
-                    fairness_df = pd.DataFrame(rows).sort_values("f1", ascending=False)
-                    st.dataframe(fairness_df.style.format({"accuracy": "{:.3f}", "f1": "{:.3f}"}))
-
-                    fig_bar = px.bar(
-                        fairness_df,
-                        x="group",
-                        y="f1",
-                        hover_data=["n_states","accuracy"],
-                        title=f"F1 score by {group_by}",
-                        labels={"f1":"F1 score","group":group_by},
-                    )
-                    st.plotly_chart(fig_bar, use_container_width=True)
+                # Use only rows that actually have a high_ev label
+                df_fair = model_df.dropna(subset=["high_ev"]).copy()
+                if df_fair.empty:
+                    st.info("No rows with a valid high_ev label; cannot compute fairness metrics.")
                 else:
-                    st.info("Not enough states per group to compute fairness metrics.")
+                    X_all = df_fair[feature_cols_reg].astype(float)
+                    y_all = df_fair["high_ev"].astype(int)
 
-        st.markdown("---")
-        st.subheader("Ethical & Real-World Considerations")
-        st.markdown(
-            """
-            - **Misclassification impact:** Over- or under-estimating EV adoption may lead to **overbuilt** or **underbuilt** charging infrastructure.  
-            - **Data limitations:** Models operate on **state-level aggregates** and ignore within-state disparities.  
-            - **Non-policy disclaimer:** This tool is for **educational and exploratory purposes only**, not official forecasts or investment advice.  
-            """
-        )
+                    y_pred_all = rf_model.predict(X_all)
+                    df_fair["pred_high_ev"] = y_pred_all
+
+                    rows = []
+                    for g, sub in df_fair.groupby(group_by):
+                        if len(sub) < 3:
+                            continue
+                        acc_g = accuracy_score(sub["high_ev"], sub["pred_high_ev"])
+                        f1_g = f1_score(sub["high_ev"], sub["pred_high_ev"])
+                        rows.append(
+                            {
+                                "group": str(g),
+                                "n_states": len(sub),
+                                "accuracy": acc_g,
+                                "f1": f1_g,
+                            }
+                        )
+
+                    if rows:
+                        fairness_df = pd.DataFrame(rows).sort_values("f1", ascending=False)
+                        st.subheader("Group-wise performance")
+                        st.markdown(
+                            "Each row shows how well the classifier performs for that group "
+                            "(higher F1 ≈ better balance of precision and recall)."
+                        )
+                        st.dataframe(
+                            fairness_df.style.format(
+                                {"accuracy": "{:.3f}", "f1": "{:.3f}"}
+                            )
+                        )
+
+                        fig_bar = px.bar(
+                            fairness_df,
+                            x="group",
+                            y="f1",
+                            hover_data=["n_states", "accuracy"],
+                            title=f"F1 score by {group_by}",
+                            labels={"f1": "F1 score", "group": group_by},
+                        )
+                        st.plotly_chart(fig_bar, use_container_width=True)
+                    else:
+                        st.info("Not enough states per group to compute fairness metrics.")
 
 # ------------------------------------------------------------
 # 🔍 11. Interpretability
