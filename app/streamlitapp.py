@@ -485,6 +485,10 @@ if target_col_reg is not None and feature_cols_reg:
             model_df_model["high_ev"] = (
                 model_df_model[target_col_reg] >= threshold
             ).astype(int)
+            # Map high_ev label back to full model_df so other tabs can use it
+            if "state" in model_df_model.columns and "state" in model_df.columns:
+                high_ev_map = model_df_model.set_index("state")["high_ev"]
+                model_df["high_ev"] = model_df["state"].map(high_ev_map)
 
             X_clf = model_df_model[feature_cols_reg].astype(float)
             y_clf = model_df_model["high_ev"]
