@@ -191,6 +191,13 @@ for col in ["EV_Count", "station_count", "median_income"]:
         df_base[col] = pd.to_numeric(df_base[col], errors="coerce")
 
 # Population-normalized metrics if possible
+# Handle alternate naming from previous notebooks ( *_pop )
+if "EV_per_1000" not in df_base.columns and "EV_per_1000_pop" in df_base.columns:
+    df_base["EV_per_1000"] = pd.to_numeric(df_base["EV_per_1000_pop"], errors="coerce")
+
+if "Stations_per_100k" not in df_base.columns and "Stations_per_100k_pop" in df_base.columns:
+    df_base["Stations_per_100k"] = pd.to_numeric(df_base["Stations_per_100k_pop"], errors="coerce")
+
 if "population" in df_base.columns and "EV_Count" in df_base.columns:
     df_base["EV_per_1000"] = (df_base["EV_Count"] / df_base["population"]) * 1000
 
