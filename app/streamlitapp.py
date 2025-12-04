@@ -908,7 +908,7 @@ with tab_regions:
         if not radar_df.empty:
             # normalize 0-1
              # normalize 0–1 column-wise
-             radar_norm = (radar_df - radar_df.min()) / (radar_df.max() - radar_df.min() + 1e-9)
+            radar_norm = (radar_df - radar_df.min()) / (radar_df.max() - radar_df.min() + 1e-9)
             from math import pi
             labels = radar_vars
             angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
