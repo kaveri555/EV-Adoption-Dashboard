@@ -1799,7 +1799,7 @@ with tab_about:
         and how these patterns raise **fairness and accessibility questions**.
 
         ---
-        ## 1️⃣ Technical Implementation   
+        ##  Technical Implementation   
 
         **App Structure & Navigation**
         - Multi-tab Streamlit app with clearly named views: Home, Data Viewer, Data Dictionary,  
@@ -1821,7 +1821,7 @@ with tab_about:
         - Logic is modular: loading, cleaning, feature engineering, ML, and visualization are separated in code.
 
         ---
-        ##  Business Value & Story   
+        ##  Why this matters ?   
 
         **Problem Framing**
         - EVs are central to decarbonization, but adoption is uneven.
@@ -1842,7 +1842,7 @@ with tab_about:
         ---
         ## Data Science Excellence   
 
-        ### 3.1 Data Sources & Cleaning
+        ### 1 Data Sources & Cleaning
         - **EV registrations by state** (counts over time and latest snapshot).  
         - **Public charging stations** (AFDC) aggregated to state level.  
         - **Median household income** from ACS.  
@@ -1860,12 +1860,12 @@ with tab_about:
           - `charger_gap = ideal_station_count - station_count`  
         - Region labels (Northeast, Midwest, South, West) and income/policy quartiles for fairness analysis.
 
-        ### 3.2 Data Quality & Imputation
+        ### 2 Data Quality & Imputation
         - Missingness profile visualized as bar chart + summary table.
         - Base frame uses simple strategies (median for income).
         - A separate KNN-imputed frame (`df_knn`) is used for ML to show more advanced handling of gaps.
 
-        ### 3.3 Linear Algebra & Specialized Methods
+        ### 3 Linear Algebra & Specialized Methods
         - **Standardization** of numeric features with `StandardScaler`.
         - **PCA (Principal Component Analysis)**:
           - 2-component PCA on scaled features.
@@ -1875,7 +1875,7 @@ with tab_about:
           - Clusters states in the PCA space (k=3) to reveal EV/charger/income policy “profiles”.
           - Visualized via PCA scatter + radar charts for selected states.
 
-        ### 3.4 Machine Learning Models
+        ### 4 Machine Learning Models
         **Regression (EV Adoption as a Continuous Outcome)**
         - Linear Regression, Ridge, Lasso, Random Forest Regressor, Gradient Boosting Regressor.
         - Target: `EV_per_1000` (EVs per 1,000 residents).
@@ -1888,7 +1888,7 @@ with tab_about:
         - Metrics: Accuracy, macro F1, ROC AUC (where probabilities are available).
         - Confusion matrix for the Random Forest model.
 
-        ### 3.5 Fairness, Ethics, and Interpretability
+        ### 5 Fairness, Ethics, and Interpretability
         - **Fairness Slicing**:
           - Group-wise performance (accuracy, F1) by region, income quartile, and policy quartile.
           - Highlights whether the classifier is more accurate for some groups than others.
@@ -1901,7 +1901,7 @@ with tab_about:
           - Radar charts summarizing multi-dimensional profiles of selected states.
 
         ---
-        ## 4️⃣ Limitations & Future Work  
+        ##  Limitations & Future Work  
 
         **Limitations**
         - State-level view hides intra-state disparities (urban vs rural, neighborhood-level differences).
@@ -1915,7 +1915,7 @@ with tab_about:
         - Add formal statistical tests (ANOVA, regression coefficients) directly into the UI.
 
         ---
-        ## 5️⃣ Use of AI Assistance  
+        ##  Use of AI Assistance  
 
         Parts of this dashboard (code scaffolding, refactoring, and wording suggestions) were  
         assisted by AI tools (ChatGPT5, OpenAI, 2025).
