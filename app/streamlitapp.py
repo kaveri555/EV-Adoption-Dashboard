@@ -607,31 +607,90 @@ with tab_home:
         if "median_income" in df_filtered.columns:
             st.metric("Median Income", f"${df_filtered['median_income'].median():,.0f}")
 
+    # ------------------ Top 10 bar: EV_per_1000 by state ------------------
     st.markdown("---")
     st.subheader("Top 10 States by EVs per 1,000 Residents")
 
     if "EV_per_1000" in df_filtered.columns:
         top_ev = df_filtered.nlargest(10, "EV_per_1000")
-        fig = px.bar(
+        fig_top10 = px.bar(
             top_ev,
             x="state",
             y="EV_per_1000",
             hover_data=["EV_Count", "station_count", "median_income"],
             labels={"EV_per_1000": "EVs per 1,000 residents"},
+            title="Top 10 states by EVs per 1,000 residents",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig_top10, use_container_width=True)
     else:
         st.info("EV_per_1000 not available; computed per-pop metrics may be in another file.")
-        # ------------------ New: Flexible EDA comparison tool ------------------
+
+    # ------------------ State-wise metrics (bar by state) ------------------
     st.markdown("---")
-    st.subheader("Exploratory comparisons (pick any metrics)")
+    st.subheader("State-wise overview (choose any metric)")
+
+    # what metrics you want to show by state
+    state_metric_options = {}
+    if "EV_Count" in df_filtered.columns:
+        state_metric_options["Total EV count"] = "EV_Count"
+    if "EV_per_1000" in df_filtered.columns:
+        state_metric_options["EVs per 1,000 residents"] = "EV_per_1000"
+    if "station_count" in df_filtered.columns:
+        state_metric_options["Number of charging stations"] = "station_count"
+    if "Stations_per_100k" in df_filtered.columns:
+        state_metric_options["Stations per 100k residents"] = "Stations_per_100k"
+    if "EV_per_station" in df_filtered.columns:
+        state_metric_options["EVs per station"] = "EV_per_station"
+
+    if state_metric_options:
+        col_sm1, col_sm2 = st.columns([2, 1])
+        with col_sm1:
+            state_metric_label = st.selectbox(
+                "Metric to visualize by state:",
+                list(state_metric_options.keys()),
+            )
+        with col_sm2:
+            top_n = st.slider(
+                "How many states to show (sorted by value)?",
+                min_value=5,
+                max_value=len(df_filtered),
+                value=min(10, len(df_filtered)),
+                step=1,
+            )
+
+        state_metric_col = state_metric_options[state_metric_label]
+        state_df = (
+            df_filtered[["state", "region", state_metric_col]]
+            .dropna(subset=[state_metric_col])
+            .sort_values(state_metric_col, ascending=False)
+            .head(top_n)
+        )
+
+        if not state_df.empty:
+            fig_state = px.bar(
+                state_df,
+                x="state",
+                y=state_metric_col,
+                color="region" if "region" in state_df.columns else None,
+                labels={state_metric_col: state_metric_label},
+                title=f"{state_metric_label} — top {top_n} states",
+            )
+            st.plotly_chart(fig_state, use_container_width=True)
+        else:
+            st.info("No non-missing values for this metric after filters.")
+    else:
+        st.info("No state-level numeric metrics available to plot.")
+
+    # ------------------ Flexible comparison tool ------------------
+    st.markdown("---")
+    st.subheader("Exploratory comparisons (EV / stations vs drivers)")
 
     st.markdown(
-        "Use the selectors below to compare EV adoption or infrastructure metrics "
-        "against income, population, policy, renewable share, or charger gap."
+        "Compare EV or charging metrics against **population, income, policy, renewable share, or charger gap**. "
+        "You can switch between a **scatter plot** and a **bar chart grouped by driver quartiles**."
     )
 
-    # Y-axis options: outcomes / adoption metrics
+    # Y-axis: adoption / infrastructure metrics
     y_choices = {}
     if "EV_per_1000" in df_filtered.columns:
         y_choices["EV per 1,000 residents"] = "EV_per_1000"
@@ -644,7 +703,7 @@ with tab_home:
     if "EV_per_station" in df_filtered.columns:
         y_choices["EVs per station"] = "EV_per_station"
 
-    # X-axis options: drivers / context metrics
+    # X-axis: drivers / context
     x_choices = {}
     if "population" in df_filtered.columns:
         x_choices["Population (ACS)"] = "population"
@@ -664,16 +723,25 @@ with tab_home:
             "(population, income, policy, renewable, or charger_gap)."
         )
     else:
-        y_label = st.selectbox(
-            "Y-axis: outcome / adoption metric",
-            list(y_choices.keys()),
-            index=0,
-        )
-        x_label = st.selectbox(
-            "X-axis: driver / context metric",
-            list(x_choices.keys()),
-            index=min(1, len(x_choices) - 1),  # try not to pick the first one twice
-        )
+        col_sel1, col_sel2, col_sel3 = st.columns([2, 2, 1.5])
+        with col_sel1:
+            y_label = st.selectbox(
+                "Y-axis: outcome / adoption metric",
+                list(y_choices.keys()),
+                index=0,
+            )
+        with col_sel2:
+            x_label = st.selectbox(
+                "X-axis: driver / context metric",
+                list(x_choices.keys()),
+                index=min(1, len(x_choices) - 1),
+            )
+        with col_sel3:
+            view_type = st.radio(
+                "View type",
+                ["Scatter", "Bar (by driver quartile)"],
+                index=0,
+            )
 
         y_col = y_choices[y_label]
         x_col = x_choices[x_label]
@@ -686,37 +754,69 @@ with tab_home:
                 "Try changing the filters or choosing different metrics."
             )
         else:
-            hover_candidates = [
-                "EV_per_1000",
-                "EV_Count",
-                "station_count",
-                "Stations_per_100k",
-                "median_income",
-                "policy",
-                "population",
-                "charger_gap",
-                "renewable_share",
-            ]
-            hover_cols = [
-                c
-                for c in hover_candidates
-                if c in comp_df.columns and c not in [x_col, y_col]
-            ]
+            if view_type == "Scatter":
+                hover_candidates = [
+                    "EV_per_1000",
+                    "EV_Count",
+                    "station_count",
+                    "Stations_per_100k",
+                    "median_income",
+                    "policy",
+                    "population",
+                    "charger_gap",
+                    "renewable_share",
+                ]
+                hover_cols = [
+                    c
+                    for c in hover_candidates
+                    if c in comp_df.columns and c not in [x_col, y_col]
+                ]
 
-            fig_comp = px.scatter(
-                comp_df,
-                x=x_col,
-                y=y_col,
-                color="region" if "region" in comp_df.columns else None,
-                hover_name="state" if "state" in comp_df.columns else None,
-                hover_data=hover_cols,
-                labels={x_col: x_label, y_col: y_label},
-                title=f"{y_label} vs {x_label}",
-            )
-            fig_comp.update_traces(marker=dict(size=10, opacity=0.8))
-            st.plotly_chart(fig_comp, use_container_width=True)
+                fig_comp = px.scatter(
+                    comp_df,
+                    x=x_col,
+                    y=y_col,
+                    color="region" if "region" in comp_df.columns else None,
+                    hover_name="state" if "state" in comp_df.columns else None,
+                    hover_data=hover_cols,
+                    labels={x_col: x_label, y_col: y_label},
+                    title=f"{y_label} vs {x_label} (scatter)",
+                )
+                fig_comp.update_traces(marker=dict(size=10, opacity=0.8))
+                st.plotly_chart(fig_comp, use_container_width=True)
 
-            # Simple correlation note (if we have enough points)
+            else:  # Bar (by driver quartile)
+                try:
+                    comp_df["driver_bin"] = pd.qcut(
+                        comp_df[x_col],
+                        4,
+                        labels=["Q1 (low)", "Q2", "Q3", "Q4 (high)"],
+                    )
+                    grouped = (
+                        comp_df.groupby("driver_bin")[y_col]
+                        .mean()
+                        .reset_index()
+                        .rename(columns={y_col: "mean_y"})
+                    )
+
+                    fig_bar = px.bar(
+                        grouped,
+                        x="driver_bin",
+                        y="mean_y",
+                        labels={
+                            "driver_bin": f"{x_label} quartile",
+                            "mean_y": f"Mean {y_label}",
+                        },
+                        title=f"{y_label} vs {x_label} (mean by quartile)",
+                    )
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                except Exception:
+                    st.warning(
+                        "Could not compute quartiles for this driver metric. "
+                        "Try using the scatter view instead."
+                    )
+
+            # Simple correlation (only if enough points and numeric)
             if comp_df[[x_col, y_col]].dropna().shape[0] >= 3:
                 corr_val = comp_df[[x_col, y_col]].corr().iloc[0, 1]
                 st.caption(
