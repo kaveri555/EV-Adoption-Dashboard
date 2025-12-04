@@ -1791,71 +1791,134 @@ with tab_about:
         ## Project Overview  
 
         **Title:** Electric Vehicle (EV) Adoption and Charging Infrastructure Across U.S. States  
-        **Course:** CMSE 830  
-        **Developed by:** Kaveri Palicherla  
+        **Course:** CMSE 830 – Data Science  
+        **Student:** Kaveri Palicherla  
+
+        The goal of this project is to build an end-to-end, deployable data science application that explains  
+        **where EV adoption is happening**, how it relates to **income, infrastructure, policy, and energy mix**,  
+        and how these patterns raise **fairness and accessibility questions**.
 
         ---
-        ### Objectives  
-        - Explore **where** EV adoption is strongest or weakest.  
-        - Examine how **income, policy support, and renewable energy** relate to EV uptake.  
-        - Identify potential **charger gaps** where infrastructure lags behind EV growth.  
-        - Demonstrate a full **data-science + ML workflow** in a web app.
+        ## 1️⃣ Technical Implementation   
+
+        **App Structure & Navigation**
+        - Multi-tab Streamlit app with clearly named views: Home, Data Viewer, Data Dictionary,  
+          Data Quality & Imputation, Geographic View, Trends & Forecast, Correlations & Multivariate,  
+          Regional Profiles & Clusters, Predictive Models, Charger Gap & What-If, Fairness & Bias, Interpretability, About.
+        - Global sidebar filters (region, state, income range, policy range, presets) that control *all* EDA tabs.
+        - Lightweight help text on each tab (“You are here → …”) for orientation.
+
+        **Interactivity & Error Handling**
+        - Interactive Plotly charts (hover, zoom, export) and filter-driven visuals.
+        - Mode switches (e.g., bar vs. scatter, state selections, metric selections).
+        - Defensive programming: when filters return no rows, the app shows:
+          `⚠ No data available for the selected filters. Try changing filters or presets.`  
+        - ML sections guard against missing columns or too few rows and degrade gracefully without crashing.
+
+        **Deployment Readiness**
+        - Uses a single `streamlitapp.py` entry point.
+        - External data files kept under `data/processed/` and `data/raw/`.
+        - Logic is modular: loading, cleaning, feature engineering, ML, and visualization are separated in code.
 
         ---
-        ### Data Pipeline (Conceptual Architecture)  
+        ##  Business Value & Story   
 
-        1. **Data Collection**  
-           - EV registrations by state  
-           - Public charging stations (AFDC)  
-           - Income (ACS)  
-           - Energy (SEDS)  
-           - Policies / laws  
+        **Problem Framing**
+        - EVs are central to decarbonization, but adoption is uneven.
+        - The dashboard treats EV adoption as not just a *technology* issue but also an *access and equity* issue:
+          income, policy support, and charging infrastructure position some states ahead of others.
 
-        2. **Data Wrangling & Cleaning**  
-           - Type coercion, de-duplication  
-           - Joining on state / state codes  
-           - Creating `EV_per_1000`, `Stations_per_100k`, `charger_gap`  
-           - Imputation (median/mode + KNN)  
+        **Key Questions Addressed**
+        - Which states have high EV adoption *per capita*, and do they also have enough charging stations?
+        - How strongly is EV adoption associated with **income** and **policy support**?
+        - Where are **charger gaps**, i.e., states that may be “EV-heavy but charger-light”?
+        - How consistent is model performance across regions and income / policy quartiles?
 
-        3. **Feature Engineering & Linear Algebra**  
-           - Normalization & scaling  
-           - PCA (PC1, PC2)  
-           - Clustering with K-means  
-
-        4. **Modeling**  
-           - Regression: predict **EV_per_1000**  
-           - Classification: **High vs Low** EV adoption  
-           - Evaluation: R², MAE, RMSE, Accuracy, F1, ROC AUC  
-
-        5. **Interpretability & Fairness**  
-           - Feature importance (Random Forest)  
-           - Group-wise performance by region, income, policy quartiles  
-
-        6. **Deployment**  
-           - Streamlit app with multi-tab navigation  
-           - Interactive filtering, downloads, and what-if scenarios.  
+        **User-Centric Features**
+        - Home tab summary for a non-technical audience (key metrics + story).
+        - What-If tab: simple scenario analysis (“What if this state increases chargers by X%?”).
+        - Fairness view: surfaces group-wise performance to encourage cautious interpretation of model output.
 
         ---
-        ### Tools & Libraries  
+        ## Data Science Excellence   
 
-        - **Python**: pandas, numpy, scikit-learn, seaborn, matplotlib, plotly, streamlit  
-        - **Stats & ML**: regression, classification, PCA, clustering, fairness slicing  
-        - **Visualization**: choropleths, bubble maps, radar charts, dual-axis trends  
+        ### 3.1 Data Sources & Cleaning
+        - **EV registrations by state** (counts over time and latest snapshot).  
+        - **Public charging stations** (AFDC) aggregated to state level.  
+        - **Median household income** from ACS.  
+        - **Population** from ACS to compute per-capita metrics.  
+        - **Policy / incentives** (policy score).  
+        - **Energy mix** (renewable share) where available.
+
+        **Processing & Feature Engineering**
+        - Type coercion, removal of currency symbols and commas, numeric conversion.
+        - Population-normalized indicators:
+          - `EV_per_1000 = EV_Count / population * 1000`  
+          - `Stations_per_100k = station_count / population * 100000`  
+        - Infrastructure sufficiency proxy:
+          - `ideal_station_count = EV_Count / 20`  
+          - `charger_gap = ideal_station_count - station_count`  
+        - Region labels (Northeast, Midwest, South, West) and income/policy quartiles for fairness analysis.
+
+        ### 3.2 Data Quality & Imputation
+        - Missingness profile visualized as bar chart + summary table.
+        - Base frame uses simple strategies (median for income).
+        - A separate KNN-imputed frame (`df_knn`) is used for ML to show more advanced handling of gaps.
+
+        ### 3.3 Linear Algebra & Specialized Methods
+        - **Standardization** of numeric features with `StandardScaler`.
+        - **PCA (Principal Component Analysis)**:
+          - 2-component PCA on scaled features.
+          - Explained-variance bar chart and a PC1–PC2 scatter plot colored by cluster.
+          - PC1/PC2 reused in the clustering & profiles tab.
+        - **K-Means Clustering**:
+          - Clusters states in the PCA space (k=3) to reveal EV/charger/income policy “profiles”.
+          - Visualized via PCA scatter + radar charts for selected states.
+
+        ### 3.4 Machine Learning Models
+        **Regression (EV Adoption as a Continuous Outcome)**
+        - Linear Regression, Ridge, Lasso, Random Forest Regressor, Gradient Boosting Regressor.
+        - Target: `EV_per_1000` (EVs per 1,000 residents).
+        - Metrics: Test R², MAE, RMSE, 5-fold CV R².
+        - Predicted vs. actual scatter plot for the best model.
+
+        **Classification (High vs. Low EV Adoption)**
+        - Logistic Regression and Random Forest Classifier.
+        - Binary label: `high_ev` based on median split of `EV_per_1000`.
+        - Metrics: Accuracy, macro F1, ROC AUC (where probabilities are available).
+        - Confusion matrix for the Random Forest model.
+
+        ### 3.5 Fairness, Ethics, and Interpretability
+        - **Fairness Slicing**:
+          - Group-wise performance (accuracy, F1) by region, income quartile, and policy quartile.
+          - Highlights whether the classifier is more accurate for some groups than others.
+        - **Ethical Discussion**:
+          - Potential harm of over- or under-estimating adoption for infrastructure planning.
+          - Limitations of state-level aggregates and lack of within-state granularity.
+        - **Interpretability**:
+          - Feature importance for Random Forest regression and classification.
+          - PCA explained-variance plot showing how much variation is captured in PC1/PC2.
+          - Radar charts summarizing multi-dimensional profiles of selected states.
 
         ---
-        ### Ethics & Disclaimer  
+        ## 4️⃣ Limitations & Future Work  
 
-        - This application is built for **educational purposes**, not official forecasting.  
-        - Models capture **correlations**, not causation.  
-        - State-level data hides within-state inequalities and local context.  
-        - Any policy implications must be interpreted cautiously and supplemented with domain expertise.
+        **Limitations**
+        - State-level view hides intra-state disparities (urban vs rural, neighborhood-level differences).
+        - Some variables (policy, renewable share) are coarse summary indicators.
+        - Time-series forecasting is deliberately simple (linear) and for illustration only.
+
+        **Future Extensions**
+        - Integrate more granular spatial data (counties or zip codes).
+        - Incorporate vehicle type breakdowns (BEV vs PHEV) and charger types (Level 2 vs DC fast).
+        - Explore more advanced models (e.g., gradient boosting with SHAP for richer interpretability).
+        - Add formal statistical tests (ANOVA, regression coefficients) directly into the UI.
 
         ---
-        ### Use of AI  
+        ## 5️⃣ Use of AI Assistance  
 
-        Parts of this dashboard (code structure, wording) were assisted by AI tools  
-        (ChatGPT, OpenAI, 2025). All content was reviewed and adapted manually.  
-
+        Parts of this dashboard (code scaffolding, refactoring, and wording suggestions) were  
+        assisted by AI tools (ChatGPT5, OpenAI, 2025).
         """
     )
 
