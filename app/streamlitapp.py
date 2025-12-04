@@ -1182,32 +1182,62 @@ with tab_trends:
             )
             st.plotly_chart(fig_trend, use_container_width=True)
 
-        # Simple forecast for one chosen state
-        st.markdown("### Simple linear forecast for a single state")
-        state_for_forecast = st.selectbox(
-            "State for forecast:",
-            options=sorted(state_year_df["state"].unique()),
-        )
-        sub = state_year_df[state_year_df["state"] == state_for_forecast].dropna(subset=[year_col, val_col])
-        if len(sub) >= 3:
+               # ---------------------------------------------
+        # Simple forecast OR growth scenario
+        # ---------------------------------------------
+        st.markdown("### Simple linear forecast or growth scenario")
+
+        # States that actually have ≥ 3 years of data
+        states_with_history = []
+        for st_name, g in state_year_df.groupby("state"):
+            if g[year_col].nunique() >= 3:
+                states_with_history.append(st_name)
+
+        if states_with_history:
+            # ✅ True regression-based forecast
+            st.caption(
+                "States below have at least 3 years of EV data — using a simple linear "
+                "regression forecast for illustration."
+            )
+
+            state_for_forecast = st.selectbox(
+                "State for regression-based forecast:",
+                options=sorted(states_with_history),
+            )
+
+            sub = (
+                state_year_df[state_year_df["state"] == state_for_forecast]
+                .dropna(subset=[year_col, val_col])
+                .sort_values(year_col)
+            )
+
             X_year = sub[year_col].values.reshape(-1, 1)
             y_ev = sub[val_col].values
+
+            # Fit linear regression on historical data
             lr = LinearRegression()
             lr.fit(X_year, y_ev)
 
-            future_years = np.arange(sub[year_col].max() + 1, sub[year_col].max() + 6)
+            # Forecast next 5 years
+            last_year = sub[year_col].max()
+            future_years = np.arange(last_year + 1, last_year + 6)
             y_pred = lr.predict(future_years.reshape(-1, 1))
 
             fig_fore = go.Figure()
             fig_fore.add_trace(
-                go.Scatter(x=sub[year_col], y=y_ev, mode="lines+markers", name="Historical")
+                go.Scatter(
+                    x=sub[year_col],
+                    y=y_ev,
+                    mode="lines+markers",
+                    name="Historical"
+                )
             )
             fig_fore.add_trace(
                 go.Scatter(
                     x=future_years,
                     y=y_pred,
                     mode="lines+markers",
-                    name="Forecast",
+                    name="Forecast (Linear)",
                     line=dict(dash="dash"),
                 )
             )
@@ -1217,9 +1247,93 @@ with tab_trends:
                 height=400,
             )
             st.plotly_chart(fig_fore, use_container_width=True)
-            st.caption("Simple linear trend forecast (for illustration only, not policy advice).")
+
+            st.caption(
+                "This is a **simple linear trend fit** on historical EV counts for the selected state. "
+                "It is for illustration only and not a production-grade forecast."
+            )
+
         else:
-            st.info("Not enough years for a meaningful forecast.")
+            # 🚧 Fallback: no state has 3+ years → use scenario-based growth
+            st.caption(
+                "The current state-year dataset has fewer than 3 years of data per state, "
+                "so a regression forecast is not meaningful.\n\n"
+                "Instead, use this **what-if scenario** based on the latest observed year "
+                "and an assumed annual growth rate."
+            )
+
+            state_for_growth = st.selectbox(
+                "State for growth scenario:",
+                options=sorted(state_year_df["state"].unique()),
+            )
+
+            sub = (
+                state_year_df[state_year_df["state"] == state_for_growth]
+                .dropna(subset=[year_col, val_col])
+                .sort_values(year_col)
+            )
+
+            if sub.empty:
+                st.info("No valid EV counts for this state in the state-year file.")
+            else:
+                latest_row = sub.iloc[-1]
+                base_year = int(latest_row[year_col])
+                base_value = float(latest_row[val_col])
+
+                st.write(
+                    f"Latest available data for **{state_for_growth}**: "
+                    f"year **{base_year}**, EVs **{base_value:,.0f}**"
+                )
+
+                growth_rate = st.slider(
+                    "Assumed annual growth rate (%)",
+                    min_value=0,
+                    max_value=50,
+                    value=15,
+                    step=1,
+                )
+                horizon = st.slider(
+                    "Number of years into the future",
+                    min_value=1,
+                    max_value=10,
+                    value=5,
+                )
+
+                years = np.arange(base_year, base_year + horizon + 1)
+                # compound growth: base_value * (1 + r)^t
+                values = base_value * (1 + growth_rate / 100.0) ** np.arange(0, horizon + 1)
+
+                fig_scenario = go.Figure()
+                fig_scenario.add_trace(
+                    go.Scatter(
+                        x=sub[year_col],
+                        y=sub[val_col],
+                        mode="lines+markers",
+                        name="Historical",
+                    )
+                )
+                fig_scenario.add_trace(
+                    go.Scatter(
+                        x=years,
+                        y=values,
+                        mode="lines+markers",
+                        name=f"Scenario ({growth_rate}%/yr)",
+                        line=dict(dash="dash"),
+                    )
+                )
+                fig_scenario.update_layout(
+                    xaxis_title="Year",
+                    yaxis_title="Registered EVs",
+                    height=400,
+                )
+                st.plotly_chart(fig_scenario, use_container_width=True)
+
+                st.caption(
+                    "This is a **scenario-based projection** using compound growth, "
+                    "not a model trained on historical data. It is meant for exploring "
+                    "“what if EVs grew at X% per year?” rather than for prediction."
+                )
+
 
 # ------------------------------------------------------------
 # 🔗 6. Correlations & Multivariate
