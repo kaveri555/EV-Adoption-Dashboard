@@ -1342,27 +1342,75 @@ with tab_corr:
     st.markdown("You are here → **🔗 Correlations & Multivariate**")
     st.info("Correlation matrix, regression relationships, and pairwise patterns.")
 
-    num_cols = [c for c in ["EV_Count","EV_per_1000","station_count","Stations_per_100k","median_income","policy","renewable_share"] if c in df_filtered.columns]
+    num_cols = [
+        c
+        for c in [
+            "EV_Count",
+            "EV_per_1000",
+            "station_count",
+            "Stations_per_100k",
+            "median_income",
+            "policy",
+            "renewable_share",
+        ]
+        if c in df_filtered.columns
+    ]
+
     if len(num_cols) >= 2:
         corr = df_filtered[num_cols].corr()
+
         st.subheader("Correlation matrix")
-        st.dataframe(corr.style.background_gradient(cmap="coolwarm").format("{:.2f}"))
+        st.markdown(
+            """
+            **What this shows:**  
+            - Each cell is a **correlation coefficient** between two metrics.  
+            - Values close to **+1** → states with higher values of one metric also tend to have higher values of the other  
+            - Values close to **–1** → when one metric is high, the other tends to be low  
+            - Values near **0** → weak or no *linear* relationship  
+
+            This helps answer questions like:  
+            *“Are states with more charging stations also the ones with higher EV adoption?”*
+            """
+        )
+
+        st.dataframe(
+            corr.style.background_gradient(cmap="coolwarm").format("{:.2f}")
+        )
 
         fig, ax = plt.subplots(figsize=(6, 4))
         sns.heatmap(corr, annot=True, cmap="coolwarm", fmt=".2f", ax=ax)
+        ax.set_title("Correlation heatmap of key EV metrics")
         st.pyplot(fig)
         plt.close(fig)
 
         st.subheader("Pairwise scatter (small pairplot)")
-        pair_cols = num_cols[:4]
+        st.markdown(
+            """
+            **How to read this pairplot:**  
+            - Each point is **one state**.  
+            - The diagonal shows the **distribution** of each metric.  
+            - Off-diagonal panels show **metric vs metric** relationships  
+              (e.g., *EV_per_1000 vs median_income*).  
+
+            Look for:  
+            - **Upward trends** → higher income / policy scores associated with higher EV adoption  
+            - **Clusters or outliers** → states that behave very differently from the rest  
+            """
+        )
+
+        pair_cols = num_cols[:4]  # keep it small so it’s readable
         pair_df = df_filtered.dropna(subset=pair_cols)
+
         if not pair_df.empty:
             sns.set(style="whitegrid")
             fig_pair = sns.pairplot(pair_df[pair_cols])
             st.pyplot(fig_pair.fig)
             plt.close(fig_pair.fig)
+        else:
+            st.info("Not enough complete rows for the selected metrics to build a pairplot.")
     else:
         st.info("Not enough numeric columns for correlation matrix.")
+
 
 # ------------------------------------------------------------
 # 🧭 7. Regional Profiles & Clusters
