@@ -390,105 +390,146 @@ clf_models = {}
 pca_model = None
 kmeans_model = None
 
+# Default: assume no ML (so other tabs can degrade gracefully)
+reg_metrics_df = pd.DataFrame()
+model_df["PC1"] = np.nan
+model_df["PC2"] = np.nan
+model_df["cluster"] = np.nan
+
 if target_col_reg is not None and feature_cols_reg:
-    model_df = model_df.dropna(subset=[target_col_reg] + feature_cols_reg).copy()
-    X = model_df[feature_cols_reg].astype(float)
-    y = model_df[target_col_reg].astype(float)
+    # Drop rows with missing target or features
+    model_df_model = model_df.dropna(subset=[target_col_reg] + feature_cols_reg).copy()
 
-    # Scaling for PCA & some models
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-
-    # PCA
-    pca_model = PCA(n_components=2, random_state=42)
-    X_pca = pca_model.fit_transform(X_scaled)
-    model_df["PC1"] = X_pca[:, 0]
-    model_df["PC2"] = X_pca[:, 1]
-
-    # KMeans clustering on PC space
-    try:
-        kmeans_model = KMeans(n_clusters=3, random_state=42, n_init=10)
-        model_df["cluster"] = kmeans_model.fit_predict(X_pca)
-    except Exception:
-        kmeans_model = None
-
-    # Regression train/test
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.25, random_state=42
-    )
-
-    def eval_regressor(name, model):
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
-        r2 = r2_score(y_test, y_pred)
-        mae = mean_absolute_error(y_test, y_pred)
-        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-        cv_r2 = cross_val_score(model, X, y, cv=5, scoring="r2").mean()
-        reg_models[name] = model
-        reg_metrics.append(
-            {
-                "model": name,
-                "R2_test": r2,
-                "MAE_test": mae,
-                "RMSE_test": rmse,
-                "CV5_R2": cv_r2,
-            }
+    # Guard: not enough rows for ML
+    if model_df_model.shape[0] < 5:
+        st.warning(
+            f"⚠ Not enough complete rows for ML (have {model_df_model.shape[0]}, need ≥ 5). "
+            "ML tabs will be disabled but the app will still run."
         )
-        return model
+    else:
+        try:
+            X = model_df_model[feature_cols_reg].astype(float)
+            y = model_df_model[target_col_reg].astype(float)
 
-    # Fit core regressors
-    eval_regressor("LinearRegression", LinearRegression())
-    eval_regressor("Ridge(alpha=1.0)", Ridge(alpha=1.0))
-    eval_regressor("Lasso(alpha=0.01)", Lasso(alpha=0.01, max_iter=10000))
-    eval_regressor(
-        "RandomForestRegressor",
-        RandomForestRegressor(n_estimators=300, random_state=42),
-    )
-    eval_regressor(
-        "GradientBoostingRegressor",
-        GradientBoostingRegressor(random_state=42),
-    )
+            # Scaling for PCA & some models
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
 
-    reg_metrics_df = pd.DataFrame(reg_metrics).sort_values("R2_test", ascending=False)
+            # PCA
+            pca_model = PCA(n_components=2, random_state=42)
+            X_pca = pca_model.fit_transform(X_scaled)
+            model_df_model["PC1"] = X_pca[:, 0]
+            model_df_model["PC2"] = X_pca[:, 1]
 
-    # Classification label: high vs low EV adoption
-    threshold = model_df[target_col_reg].median()
-    model_df["high_ev"] = (model_df[target_col_reg] >= threshold).astype(int)
+            # KMeans clustering on PC space
+            try:
+                kmeans_model = KMeans(n_clusters=3, random_state=42, n_init=10)
+                model_df_model["cluster"] = kmeans_model.fit_predict(X_pca)
+            except Exception:
+                kmeans_model = None
 
-    X_clf = X  # same features
-    y_clf = model_df["high_ev"]
+            # Push PC1/PC2/cluster back onto full model_df (by state)
+            for col in ["PC1", "PC2", "cluster"]:
+                model_df[col] = model_df_model.set_index("state")[col].reindex(model_df["state"]).values
 
-    Xc_train, Xc_test, yc_train, yc_test = train_test_split(
-        X_clf, y_clf, test_size=0.25, stratify=y_clf, random_state=42
-    )
+            # Regression train/test
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.25, random_state=42
+            )
 
-    def eval_classifier(name, model):
-        model.fit(Xc_train, yc_train)
-        y_pred = model.predict(Xc_test)
-        y_prob = model.predict_proba(Xc_test)[:, 1] if hasattr(model, "predict_proba") else None
-        acc = accuracy_score(yc_test, y_pred)
-        f1 = f1_score(yc_test, y_pred, average="macro")
-        clf_models[name] = {
-            "model": model,
-            "y_test": yc_test,
-            "y_pred": y_pred,
-            "y_prob": y_prob,
-            "accuracy": acc,
-            "f1_macro": f1,
-        }
-        return clf_models[name]
+            def eval_regressor(name, model):
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
+                r2 = r2_score(y_test, y_pred)
+                mae = mean_absolute_error(y_test, y_pred)
+                rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+                cv_r2 = cross_val_score(model, X, y, cv=5, scoring="r2").mean()
+                reg_models[name] = model
+                reg_metrics.append(
+                    {
+                        "model": name,
+                        "R2_test": r2,
+                        "MAE_test": mae,
+                        "RMSE_test": rmse,
+                        "CV5_R2": cv_r2,
+                    }
+                )
+                return model
 
-    eval_classifier("LogisticRegression", LogisticRegression(max_iter=1000))
-    eval_classifier(
-        "RandomForestClassifier",
-        RandomForestClassifier(n_estimators=300, random_state=42),
-    )
+            # Fit core regressors
+            eval_regressor("LinearRegression", LinearRegression())
+            eval_regressor("Ridge(alpha=1.0)", Ridge(alpha=1.0))
+            eval_regressor("Lasso(alpha=0.01)", Lasso(alpha=0.01, max_iter=10000))
+            eval_regressor(
+                "RandomForestRegressor",
+                RandomForestRegressor(n_estimators=300, random_state=42),
+            )
+            eval_regressor(
+                "GradientBoostingRegressor",
+                GradientBoostingRegressor(random_state=42),
+            )
 
+            reg_metrics_df = pd.DataFrame(reg_metrics).sort_values(
+                "R2_test", ascending=False
+            )
+
+            # Classification label: high vs low EV adoption
+            threshold = model_df_model[target_col_reg].median()
+            model_df_model["high_ev"] = (
+                model_df_model[target_col_reg] >= threshold
+            ).astype(int)
+
+            X_clf = model_df_model[feature_cols_reg].astype(float)
+            y_clf = model_df_model["high_ev"]
+
+            Xc_train, Xc_test, yc_train, yc_test = train_test_split(
+                X_clf, y_clf, test_size=0.25, stratify=y_clf, random_state=42
+            )
+
+            def eval_classifier(name, model):
+                model.fit(Xc_train, yc_train)
+                y_pred = model.predict(Xc_test)
+                y_prob = (
+                    model.predict_proba(Xc_test)[:, 1]
+                    if hasattr(model, "predict_proba")
+                    else None
+                )
+                acc = accuracy_score(yc_test, y_pred)
+                f1 = f1_score(yc_test, y_pred, average="macro")
+                clf_models[name] = {
+                    "model": model,
+                    "y_test": yc_test,
+                    "y_pred": y_pred,
+                    "y_prob": y_prob,
+                    "accuracy": acc,
+                    "f1_macro": f1,
+                }
+                return clf_models[name]
+
+            eval_classifier("LogisticRegression", LogisticRegression(max_iter=1000))
+            eval_classifier(
+                "RandomForestClassifier",
+                RandomForestClassifier(n_estimators=300, random_state=42),
+            )
+
+        except ValueError as e:
+            # If sklearn chokes on shape / NaNs, don't crash the whole app
+            st.warning(
+                "⚠ Skipping ML block due to a data/shape issue passed to scikit-learn. "
+                "Check that numeric columns exist and have non-missing values."
+            )
+            reg_metrics_df = pd.DataFrame()
+            pca_model = None
+            kmeans_model = None
+            model_df["PC1"] = np.nan
+            model_df["PC2"] = np.nan
+            model_df["cluster"] = np.nan
 else:
-    reg_metrics_df = pd.DataFrame()
-    model_df["PC1"] = np.nan
-    model_df["PC2"] = np.nan
-    model_df["cluster"] = np.nan
+    # No valid features / target
+    st.warning(
+        "⚠ Could not find both EV_per_1000 and at least one feature column for ML. "
+        "Predictive / clustering tabs will show limited content."
+    )
 
 # ------------------------------------------------------------
 # Tabs
