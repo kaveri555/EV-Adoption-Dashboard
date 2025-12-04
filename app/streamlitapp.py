@@ -931,7 +931,7 @@ with tab_quality:
     knn = df_knn.copy()
 
     # 0️⃣ Data quality scorecard
-    st.subheader("0. Data quality scorecard")
+    st.subheader(" Data quality scorecard")
 
     total_cells = raw.shape[0] * raw.shape[1]
     total_missing = int(raw.isna().sum().sum())
@@ -954,7 +954,7 @@ with tab_quality:
     st.markdown("---")
 
     # 1️⃣ Missingness summary: raw vs KNN-imputed
-    st.subheader("1. Missing data overview (Raw vs KNN-imputed)")
+    st.subheader(" Missing data overview (Raw vs KNN-imputed)")
 
     missing_raw = raw.isna().sum().sort_values(ascending=False)
     missing_knn = knn.isna().sum()
@@ -991,46 +991,9 @@ with tab_quality:
     else:
         st.success("✅ No missing values in the raw merged dataset at the column level.")
 
-    st.markdown("---")
-
-    # 2️⃣ Where did KNN actually change values? (Imputed cells inspector)
-    st.subheader("2. Where KNN imputation actually filled values")
-
-    # mask: was NaN in raw, but non-NaN in knn
-    mask_imputed = raw.isna() & knn.notna()
-
-    imputed_rows = []
-    # we’ll try to carry a state identifier if present, otherwise just the index
-    id_col = "state" if "state" in raw.columns else None
-
-    for col_name in raw.columns:
-        idx = mask_imputed[col_name]
-        if idx.any():
-            tmp = pd.DataFrame({
-                "row_index": raw.index[idx],
-                "state"    : raw.loc[idx, id_col] if id_col else raw.index[idx],
-                "column"   : col_name,
-                "new_value": knn.loc[idx, col_name],
-            })
-            imputed_rows.append(tmp)
-
-    if imputed_rows:
-        imputed_df = pd.concat(imputed_rows, ignore_index=True)
-        st.caption(
-            f"{len(imputed_df)} cell(s) were actually imputed by KNN. "
-            "This table shows exactly where."
-        )
-        st.dataframe(imputed_df)
-    else:
-        st.info(
-            "KNN imputer did not need to fill many (or any) cells — raw data was already complete "
-            "for the columns used in modelling. This is why raw and imputed distributions look almost identical."
-        )
-
-    st.markdown("---")
 
     # 3️⃣ Distribution before vs after imputation (select a variable)
-    st.subheader("3. Distribution before vs after KNN imputation")
+    st.subheader(" Distribution before vs after KNN imputation")
 
     # numeric columns present in both raw and knn
     numeric_common = [
