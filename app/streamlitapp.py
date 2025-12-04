@@ -918,20 +918,43 @@ with tab_dict:
     st.dataframe(dd_df)
 
 # ------------------------------------------------------------
-# 🧹 3. Data Quality & Imputation (detailed)
+# 🧹 3. Data Quality & Imputation (detailed + imputed-cells view)
 # ------------------------------------------------------------
 with tab_quality:
     st.markdown("You are here → **🧹 Data Quality & Imputation**")
     st.info(
-        "This tab shows where the data had gaps, how much was imputed, and how KNN imputation "
-        "changes the distributions of key variables."
+        "This tab documents how clean the dataset is, where missing values occurred, "
+        "and what changed (if anything) after KNN imputation."
     )
 
     raw = df_base.copy()
     knn = df_knn.copy()
 
+    # 0️⃣ Data quality scorecard
+    st.subheader("0. Data quality scorecard")
+
+    total_cells = raw.shape[0] * raw.shape[1]
+    total_missing = int(raw.isna().sum().sum())
+    missing_pct = total_missing / total_cells if total_cells > 0 else 0.0
+    cols_with_missing = int((raw.isna().sum() > 0).sum())
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total cells", f"{total_cells:,}")
+    col2.metric("Missing cells (raw)", f"{total_missing:,}", f"{missing_pct*100:.2f}%")
+    col3.metric("Columns with any missing (raw)", cols_with_missing)
+
+    if total_missing == 0:
+        st.success("✅ The merged dataset is almost fully complete — imputation has very little to do here.")
+    else:
+        st.info(
+            "Even though overall missingness is low, we still use KNN imputation so models "
+            "can train on a fully numeric matrix without row drops."
+        )
+
+    st.markdown("---")
+
     # 1️⃣ Missingness summary: raw vs KNN-imputed
-    st.subheader("1. Missing data overview (Raw vs Imputed)")
+    st.subheader("1. Missing data overview (Raw vs KNN-imputed)")
 
     missing_raw = raw.isna().sum().sort_values(ascending=False)
     missing_knn = knn.isna().sum()
@@ -945,11 +968,14 @@ with tab_quality:
     })
 
     st.caption("Columns with the most missing values before and after KNN imputation.")
-    st.dataframe(
-        missing_df[missing_df["Missing (raw)"] > 0]
-        .head(30)
-        .style.format({"Missing % (raw)": "{:.3f}", "Missing % (imputed)": "{:.3f}"})
-    )
+    if (missing_df["Missing (raw)"] > 0).any():
+        st.dataframe(
+            missing_df[missing_df["Missing (raw)"] > 0]
+            .head(30)
+            .style.format({"Missing % (raw)": "{:.3f}", "Missing % (imputed)": "{:.3f}"})
+        )
+    else:
+        st.write("No columns had missing values in the raw dataset.")
 
     # Bar chart of missingness (raw only, non-zero)
     nonzero_missing = missing_raw[missing_raw > 0]
@@ -963,31 +989,43 @@ with tab_quality:
         st.pyplot(fig_miss)
         plt.close(fig_miss)
     else:
-        st.success("✅ No missing values in the raw merged dataset.")
+        st.success("✅ No missing values in the raw merged dataset at the column level.")
 
     st.markdown("---")
 
-    # 2️⃣ Missingness pattern heatmap (for top columns)
-    st.subheader("2. Missingness pattern (raw dataset)")
+    # 2️⃣ Where did KNN actually change values? (Imputed cells inspector)
+    st.subheader("2. Where KNN imputation actually filled values")
 
-    # Take up to 20 columns with the most missing values
-    top_missing_cols = missing_raw[missing_raw > 0].index.tolist()[:20]
-    if top_missing_cols:
-        st.caption("Heatmap shows where rows had missing values (yellow = missing).")
-        fig_heat, ax_heat = plt.subplots(figsize=(10, 4))
-        sns.heatmap(
-            raw[top_missing_cols].isna(),
-            cbar=False,
-            ax=ax_heat,
-            yticklabels=False,
+    # mask: was NaN in raw, but non-NaN in knn
+    mask_imputed = raw.isna() & knn.notna()
+
+    imputed_rows = []
+    # we’ll try to carry a state identifier if present, otherwise just the index
+    id_col = "state" if "state" in raw.columns else None
+
+    for col_name in raw.columns:
+        idx = mask_imputed[col_name]
+        if idx.any():
+            tmp = pd.DataFrame({
+                "row_index": raw.index[idx],
+                "state"    : raw.loc[idx, id_col] if id_col else raw.index[idx],
+                "column"   : col_name,
+                "new_value": knn.loc[idx, col_name],
+            })
+            imputed_rows.append(tmp)
+
+    if imputed_rows:
+        imputed_df = pd.concat(imputed_rows, ignore_index=True)
+        st.caption(
+            f"{len(imputed_df)} cell(s) were actually imputed by KNN. "
+            "This table shows exactly where."
         )
-        ax_heat.set_xlabel("Columns")
-        ax_heat.set_title("Missingness pattern across top-missing columns (raw)")
-        ax_heat.tick_params(axis="x", rotation=45)
-        st.pyplot(fig_heat)
-        plt.close(fig_heat)
+        st.dataframe(imputed_df)
     else:
-        st.info("No columns with missing values to display in a pattern heatmap.")
+        st.info(
+            "KNN imputer did not need to fill many (or any) cells — raw data was already complete "
+            "for the columns used in modelling. This is why raw and imputed distributions look almost identical."
+        )
 
     st.markdown("---")
 
@@ -1000,7 +1038,6 @@ with tab_quality:
         if c in knn.columns and pd.api.types.is_numeric_dtype(raw[c])
     ]
 
-    # Prefer “interesting” variables near the top
     preferred_order = [
         "EV_per_1000",
         "Stations_per_100k",
@@ -1026,40 +1063,33 @@ with tab_quality:
         raw_col = raw[col_choice]
         knn_col = knn[col_choice]
 
-        col1, col2 = st.columns(2)
+        # Overlayed histograms to show they almost match
+        fig_overlay, ax_overlay = plt.subplots(figsize=(6, 4))
+        sns.histplot(raw_col.dropna(), kde=True, label="Raw", ax=ax_overlay, color="tab:blue", alpha=0.5)
+        sns.histplot(knn_col.dropna(), kde=True, label="Imputed (KNN)", ax=ax_overlay, color="tab:orange", alpha=0.5)
+        ax_overlay.set_xlabel(col_choice)
+        ax_overlay.set_ylabel("Count")
+        ax_overlay.set_title(f"Raw vs KNN-imputed distribution: {col_choice}")
+        ax_overlay.legend()
+        st.pyplot(fig_overlay)
+        plt.close(fig_overlay)
 
-        # Histograms side by side
-        with col1:
-            st.markdown(f"**Raw distribution — {col_choice}**")
-            fig_raw, ax_raw = plt.subplots(figsize=(4, 3))
-            sns.histplot(raw_col.dropna(), kde=True, ax=ax_raw)
-            ax_raw.set_xlabel(col_choice)
-            ax_raw.set_ylabel("Count")
-            st.pyplot(fig_raw)
-            plt.close(fig_raw)
-
-        with col2:
-            st.markdown(f"**Imputed distribution — {col_choice}**")
-            fig_imp, ax_imp = plt.subplots(figsize=(4, 3))
-            sns.histplot(knn_col.dropna(), kde=True, ax=ax_imp)
-            ax_imp.set_xlabel(col_choice)
-            ax_imp.set_ylabel("Count")
-            st.pyplot(fig_imp)
-            plt.close(fig_imp)
-
-        # Small numeric summary
+        # Small numeric summary + delta
         summary_df = pd.DataFrame(
             {
-                "Raw (mean)": [raw_col.mean()],
-                "Imputed (mean)": [knn_col.mean()],
-                "Raw (median)": [raw_col.median()],
-                "Imputed (median)": [knn_col.median()],
-                "Raw (std)": [raw_col.std()],
-                "Imputed (std)": [knn_col.std()],
+                "Raw mean": [raw_col.mean()],
+                "Imputed mean": [knn_col.mean()],
+                "Δ mean (imputed - raw)": [knn_col.mean() - raw_col.mean()],
+                "Raw median": [raw_col.median()],
+                "Imputed median": [knn_col.median()],
+                "Raw std": [raw_col.std()],
+                "Imputed std": [knn_col.std()],
             }
-        ).T.rename(columns={0: "value"}).round(3)
+        ).T.rename(columns={0: "value"}).round(4)
 
-        st.caption("Summary stats before vs after imputation:")
+        st.caption(
+            "Summary stats before vs after imputation. Small deltas indicate that KNN preserved the original distribution."
+        )
         st.dataframe(summary_df)
 
     st.markdown("---")
@@ -1069,7 +1099,6 @@ with tab_quality:
 
     key_vars = [c for c in ["EV_per_1000", "Stations_per_100k", "median_income", "policy"] if c in numeric_common]
     if key_vars:
-        # Build long-format dataframe
         long_rows = []
         for c in key_vars:
             long_rows.append(
@@ -1096,9 +1125,13 @@ with tab_quality:
         ax_box.tick_params(axis="x", rotation=45)
         st.pyplot(fig_box)
         plt.close(fig_box)
+
+        st.caption(
+            "Because missingness is low, the raw and KNN-imputed boxplots overlap strongly — "
+            "which is what we want: imputation should *fix gaps* without distorting the signal."
+        )
     else:
         st.info("Key comparison vars (EV_per_1000, Stations_per_100k, etc.) not all present; skipping boxplot.")
-
 
 # ------------------------------------------------------------
 # 🌍 4. Geographic View (Map + Bubble)
